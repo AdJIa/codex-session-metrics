@@ -36685,10 +36685,40 @@ var SessionStore = class {
     };
     await walk(join(this.home, "sessions"));
   }
-  async list() {
+  async titles() {
+    const path = join(this.home, "session_index.jsonl");
+    try {
+      const info = await stat(path);
+      if (this.titleStamp === info.mtimeMs) return this.titleMap;
+      const names = /* @__PURE__ */ new Map();
+      for (const line of (await readFile(path, "utf8")).split("\n")) {
+        try {
+          const r = JSON.parse(line);
+          if (UUID.test(r.id || "") && typeof r.thread_name === "string" && r.thread_name.trim()) names.set(r.id, r.thread_name.trim());
+        } catch {
+        }
+      }
+      this.titleMap = names;
+      this.titleStamp = info.mtimeMs;
+      return names;
+    } catch {
+      return /* @__PURE__ */ new Map();
+    }
+  }
+  async list(selectedId) {
     await this.discover();
-    const rows = await Promise.all([...this.files].map(async ([id, p]) => ({ id, mtime: (await stat(p)).mtimeMs })));
-    return rows.sort((a, b) => b.mtime - a.mtime).slice(0, 30);
+    const titles = await this.titles();
+    const rows = (await Promise.all([...this.files].map(async ([id, p]) => {
+      try {
+        return { id, title: titles.get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", mtime: (await stat(p)).mtimeMs };
+      } catch {
+        return null;
+      }
+    }))).filter(Boolean).sort((a, b) => b.mtime - a.mtime);
+    const recent = rows.slice(0, 30);
+    const selected = rows.find((r) => r.id === selectedId);
+    if (selected && !recent.some((r) => r.id === selectedId)) recent.push(selected);
+    return recent;
   }
   async snapshot(id) {
     if (!UUID.test(id || "")) throw new Error("\u8BF7\u9009\u62E9\u6216\u8F93\u5165\u6709\u6548\u7684\u4F1A\u8BDD ID");
@@ -36724,7 +36754,7 @@ var SessionStore = class {
     }
     const st = c.state;
     const used = st.last?.total_tokens ?? null;
-    return { ...st, contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: await this.timing(id) };
+    return { ...st, title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: await this.timing(id) };
   }
   apply(c, r) {
     const p = r.payload || {}, s = c.state;
@@ -36816,8 +36846,8 @@ async function ensureProxy() {
 if (!process.argv.includes("--preview")) await ensureProxy();
 var store = new SessionStore();
 var html = await readFile3(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v4.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.4" }, { capabilities: { tools: {}, resources: {} } });
+var uri = "ui://session-metrics/panel-v5.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.5" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
 function metadataThread(extra) {
   const m = extra?._meta || {};
@@ -36826,10 +36856,10 @@ function metadataThread(extra) {
 server.registerResource("session-metrics-ui", uri, {}, async () => ({ contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen" } } }] }));
 server.registerTool("open_metrics", { title: "\u4F1A\u8BDD\u6307\u6807", description: "\u6253\u5F00\u5F53\u524D\u804A\u5929\u7684\u5B9E\u65F6 Token\u3001\u4E0A\u4E0B\u6587\u3001TTFT \u548C TPS \u9762\u677F\u3002\u8C03\u7528\u65F6\u4F20\u5165\u5F53\u524D thread_id\uFF0C\u4EE5\u7CBE\u786E\u7ED1\u5B9A\u4F1A\u8BDD\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {
   const id = thread_id || metadataThread(extra);
-  return result({ threadId: id || null, snapshot: id ? await store.snapshot(id) : null, needsBinding: !id });
+  return result({ threadId: id || null, snapshot: id ? await store.snapshot(id) : null, needsBinding: !id, sessions: await store.list(id) });
 });
 server.registerTool("read_metrics", { title: "\u8BFB\u53D6\u4F1A\u8BDD\u6307\u6807", description: "\u8BFB\u53D6\u6307\u5B9A\u672C\u5730\u4F1A\u8BDD\u7684\u6307\u6807\uFF1B\u4F9B\u9762\u677F\u81EA\u52A8\u5237\u65B0\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID) }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, async ({ thread_id }) => result(await store.snapshot(thread_id)));
-server.registerTool("list_sessions", { title: "\u9009\u62E9\u672C\u673A\u4F1A\u8BDD", description: "\u5217\u51FA\u6700\u8FD1\u672C\u5730\u4F1A\u8BDD ID \u548C\u66F4\u65B0\u65F6\u95F4\uFF0C\u4E0D\u8FD4\u56DE\u804A\u5929\u6B63\u6587\u3002", inputSchema: {}, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, async () => result({ sessions: await store.list() }));
+server.registerTool("list_sessions", { title: "\u9009\u62E9\u672C\u673A\u4F1A\u8BDD", description: "\u5217\u51FA\u6700\u8FD1\u672C\u5730\u4F1A\u8BDD\u540D\u79F0\u53CA\u66F4\u65B0\u65F6\u95F4\uFF0C\u4E0D\u8FD4\u56DE\u804A\u5929\u6B63\u6587\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, async ({ thread_id }) => result({ sessions: await store.list(thread_id) }));
 if (process.argv.includes("--preview")) {
   const id = process.env.METRICS_THREAD_ID;
   createServer(async (req, res) => {

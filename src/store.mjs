@@ -12,7 +12,14 @@ export class SessionStore {
     const walk=async dir=>{for(const e of await readdir(dir,{withFileTypes:true}).catch(()=>[])){const p=join(dir,e.name);if(e.isDirectory())await walk(p);else {const m=e.name.match(/([a-f0-9-]{36})\.jsonl$/i);if(m&&UUID.test(m[1]))this.files.set(m[1],p);}}};
     await walk(join(this.home,'sessions'));
   }
-  async list(){await this.discover();const rows=await Promise.all([...this.files].map(async([id,p])=>({id,mtime:(await stat(p)).mtimeMs})));return rows.sort((a,b)=>b.mtime-a.mtime).slice(0,30);}
+  async titles(){
+    const path=join(this.home,'session_index.jsonl');
+    try{const info=await stat(path);if(this.titleStamp===info.mtimeMs)return this.titleMap;
+      const names=new Map();for(const line of (await readFile(path,'utf8')).split('\n')){try{const r=JSON.parse(line);if(UUID.test(r.id||'')&&typeof r.thread_name==='string'&&r.thread_name.trim())names.set(r.id,r.thread_name.trim());}catch{}}
+      this.titleMap=names;this.titleStamp=info.mtimeMs;return names;
+    }catch{return new Map();}
+  }
+  async list(selectedId){await this.discover();const titles=await this.titles();const rows=(await Promise.all([...this.files].map(async([id,p])=>{try{return {id,title:titles.get(id)||'未命名会话',mtime:(await stat(p)).mtimeMs};}catch{return null;}}))).filter(Boolean).sort((a,b)=>b.mtime-a.mtime);const recent=rows.slice(0,30);const selected=rows.find(r=>r.id===selectedId);if(selected&&!recent.some(r=>r.id===selectedId))recent.push(selected);return recent;}
   async snapshot(id){
     if(!UUID.test(id||''))throw new Error('请选择或输入有效的会话 ID');
     await this.discover();const file=this.files.get(id);if(!file)throw new Error('本机未找到该会话记录；远程会话需要在对应主机运行插件。');
@@ -20,7 +27,7 @@ export class SessionStore {
     if(!c||s.size<c.offset){c={offset:0,pending:'',decoder:new StringDecoder('utf8'),state:{id,model:null,provider:null,window:null,last:null,total:null,turn:null,turnId:null,active:false,startedAt:null,ttftMs:null,ttftTurnId:null,requests:0,compactions:0,updatedAt:null},seen:new Set()};this.cache.set(id,c);}
     if(s.size>c.offset){const h=await open(file,'r');try{while(c.offset<s.size){const b=Buffer.alloc(Math.min(s.size-c.offset,1024*1024));const {bytesRead}=await h.read(b,0,b.length,c.offset);if(!bytesRead)break;c.offset+=bytesRead;const lines=(c.pending+c.decoder.write(b.subarray(0,bytesRead))).split('\n');c.pending=lines.pop();for(const l of lines){try{this.apply(c,JSON.parse(l));}catch{}}}}finally{await h.close();}}
     const st=c.state;const used=st.last?.total_tokens??null;
-    return {...st,contextUsed:used,contextPercent:used!==null&&st.window?used/st.window*100:null,contextBasis:'最近一次模型请求的输入 + 输出 Token（快照；下次请求前可能增长）',sampledAt:new Date().toISOString(),timing:await this.timing(id)};
+    return {...st,title:(await this.titles()).get(id)||'未命名会话',contextUsed:used,contextPercent:used!==null&&st.window?used/st.window*100:null,contextBasis:'最近一次模型请求的输入 + 输出 Token（快照；下次请求前可能增长）',sampledAt:new Date().toISOString(),timing:await this.timing(id)};
   }
   apply(c,r){const p=r.payload||{},s=c.state;s.updatedAt=r.timestamp||s.updatedAt;
     if(r.type==='session_meta'){s.provider=p.model_provider||null;return;}

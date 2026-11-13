@@ -6,6 +6,14 @@ import {join} from 'node:path';
 import {SessionStore} from '../src/store.mjs';
 import {StreamTiming} from '../src/stream.mjs';
 const id='11111111-1111-1111-1111-111111111111';
+test('session names use latest valid index entry and tolerate missing titles and partial rows',async()=>{
+ const home=await mkdtemp(join(tmpdir(),'metrics-names-'));const other='44444444-4444-4444-4444-444444444444';
+ try{await mkdir(join(home,'sessions'));for(const uuid of [id,other])await writeFile(join(home,'sessions','rollout-'+uuid+'.jsonl'),'');
+ const row=title=>JSON.stringify({id,thread_name:title})+'\n';
+ await writeFile(join(home,'session_index.jsonl'),row('旧名称')+row('新名称')+'{partial');
+ const store=new SessionStore(home);const list=await store.list(id);assert.equal(list.find(s=>s.id===id).title,'新名称');assert.equal(list.find(s=>s.id===other).title,'未命名会话');assert.equal((await store.snapshot(id)).title,'新名称');
+ }finally{await rm(home,{recursive:true,force:true});}
+});
 test('incremental log parsing preserves partial rows and never double-counts usage',async()=>{
   const home=await mkdtemp(join(tmpdir(),'metrics-test-'));
   try{await mkdir(join(home,'sessions'));const path=join(home,'sessions','rollout-'+id+'.jsonl');const row=(type,payload)=>JSON.stringify({timestamp:'2026-11-13T02:00:00Z',type,payload})+'\n';
