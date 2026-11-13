@@ -37051,8 +37051,8 @@ function metadataThread(extra) {
 // src/server.mjs
 var store = new SessionStore();
 var html = await readFile2(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v10.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.10" }, { capabilities: { tools: {}, resources: {} } });
+var uri = "ui://session-metrics/panel-v11.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.11" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
 server.registerResource("session-metrics-ui", uri, {}, async () => ({ contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen" } } }] }));
 server.registerTool("open_metrics", { title: "statusx \xB7 \u4F1A\u8BDD\u6307\u6807", description: "\u684C\u9762\u7AEF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD\u6307\u6807\uFF0C\u4F7F\u7528\u5BBF\u4E3B\u8BF7\u6C42\u5143\u6570\u636E\u81EA\u52A8\u7ED1\u5B9A\u5F53\u524D\u804A\u5929\uFF0C\u65E0\u9700\u6A21\u578B\u53C2\u4E0E\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri, visibility: ["app"] }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {

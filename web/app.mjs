@@ -12,9 +12,9 @@ const modelLabel=c=>[c?.model||'未知模型',c?.effort,c?.provider,c?.serviceTi
 const configurations=t=>(t?.configurations||[]).map(modelLabel).join(' → ')||'该轮模型配置未记录';
 function render(s){
   snapshot=s;threadId=s.id;el('error').classList.add('hide');set('live',s.active?'本轮进行中':'已同步');
-  set('context',percent(s.contextPercent));el('fill').style.width=(s.contextPercent||0)+'%';el('progress').setAttribute('aria-valuenow',String(s.contextPercent||0));
+  set('context',percent(s.contextPercent));el('fill').style.strokeDasharray=(s.contextPercent??0)+' 100';if(s.contextPercent!=null)el('progress').setAttribute('aria-valuenow',String(s.contextPercent));else el('progress').removeAttribute('aria-valuenow');el('progress').setAttribute('aria-valuetext',s.contextPercent!=null?percent(s.contextPercent)+' 已占用':'暂无上下文数据');
   set('capacity',fmt(s.contextUsed)+' / '+fmt(s.window)+' tokens');set('remaining',s.window&&s.contextUsed!=null?'剩余 '+fmt(Math.max(0,s.window-s.contextUsed)):'—');
-  set('context-note',s.context?'快照更新于 '+time(s.context.recordedAt)+(s.context.source==='compaction'?' · 压缩后':' · 请求结算后'):'等待上下文快照');
+  set('context-note',s.context?time(s.context.recordedAt)+(s.context.source==='compaction'?' · 压缩后':' · 请求结算后'):'等待上下文快照');
   const turn=s.latestCompletedTurn;
   set('ttft',turn?.ttftMs!=null?(turn.ttftMs/1000).toFixed(2):'—');set('tps',turn?.tps!=null?turn.tps.toFixed(1):'—');
   set('ttft-note',turn?turn.ttftMs!=null?'完成于 '+time(turn.completedAt):'该轮未记录 TTFT':'暂无已完成轮次');
@@ -25,12 +25,14 @@ function render(s){
   set('tool-note',turn?.toolCount!=null?'已记录 '+turn.toolCount+' 个工具条目，'+turn.timedToolCount+' 个含起止时间；并行重叠区间已合并。':'该轮未记录工具条目起止时间');
   const comp=s.latestCompaction;set('compactions',fmt(s.compactions)+' 次');
   set('compaction-change',comp?fmt(comp.beforeTokens)+' → '+fmt(comp.afterTokens)+' tokens':'暂无压缩记录');
+  const comparable=comp?.beforeTokens!=null&&comp?.afterTokens!=null;el('compaction-comparison').classList.toggle('hide',!comparable);
+  if(comparable){const max=Math.max(comp.beforeTokens,comp.afterTokens,1);el('compaction-before').style.width=comp.beforeTokens/max*100+'%';el('compaction-after').style.width=comp.afterTokens/max*100+'%';el('compaction-comparison').setAttribute('aria-label','压缩前 '+fmt(comp.beforeTokens)+' Token，压缩后 '+fmt(comp.afterTokens)+' Token');}
   set('compaction-note',comp?'最近压缩 '+time(comp.recordedAt)+' · '+(comp.reductionPercent==null?'变化量未记录':(comp.reductionPercent>=0?'下降 ':'增加 ')+percent(Math.abs(comp.reductionPercent)))+' · 耗时 '+seconds(comp.durationMs)+' 秒':'');
   renderTurns(s.recentTurns||[],s.turnSummary||{});renderCalls(s.recentCalls||[],s.recent);
-  const u=s[el('scope').value];set('input',fmt(u?.input_tokens));set('output',fmt(u?.output_tokens));set('cached',fmt(u?.cached_input_tokens));set('cache-ratio',percent(cacheRatio(u)));
+  const u=s[el('scope').value];set('input',fmt(u?.input_tokens));set('output',fmt(u?.output_tokens));set('cached',fmt(u?.cached_input_tokens));const ratio=cacheRatio(u);set('cache-ratio',percent(ratio));el('cache-fill').style.width=(ratio??0)+'%';el('cache-strip').classList.toggle('hide',ratio==null);el('cache-strip').setAttribute('aria-label',ratio!=null?'输入 Token：缓存命中 '+percent(ratio)+'，未命中 '+percent(100-ratio):'缓存输入占比缺失');
   const uncached=u?.input_tokens!=null&&u?.cached_input_tokens!=null&&u.input_tokens>=u.cached_input_tokens?u.input_tokens-u.cached_input_tokens:null;
-  set('uncached','未命中读取缓存 '+fmt(uncached));set('cache-write','缓存写入 '+fmt(u?.cache_write_input_tokens));
-  set('reasoning','推理 '+fmt(u?.reasoning_output_tokens));set('requests','已记录调用 '+fmt(s.requests));set('model','当前配置：'+modelLabel(s));syncSelection(s);set('updated',time(s.sampledAt));
+  set('uncached','未命中缓存 '+fmt(uncached));set('cache-write','缓存写入 '+fmt(u?.cache_write_input_tokens));
+  set('reasoning','推理 '+fmt(u?.reasoning_output_tokens));set('requests','调用 '+fmt(s.requests));set('model','当前配置：'+modelLabel(s));syncSelection(s);set('updated',time(s.sampledAt));
 }
 function rows(target,values){
   el(target).replaceChildren(...values.map(values=>{const row=document.createElement('tr');for(const value of values){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}return row;}));
@@ -39,7 +41,19 @@ function renderCalls(calls,u){
   set('calls-count',calls.length+' / 10 条');el('calls-empty').classList.toggle('hide',calls.length>0);
   set('recent-cache',percent(cacheRatio(u)));set('recent-cache-note',fmt(u?.cached_input_tokens)+' 缓存 / '+fmt(u?.input_tokens)+' 输入');
   set('recent-write',fmt(u?.cache_write_input_tokens));
+  outputBars(calls);
   rows('call-rows',calls.slice().reverse().map(call=>[time(call.recordedAt),call.configuration?modelLabel(call.configuration):call.model||'—',fmt(call.usage?.input_tokens),fmt(call.usage?.output_tokens),percent(cacheRatio(call.usage))]));
+}
+function outputBars(calls){
+  const svg=el('call-output-chart'),ns='http://www.w3.org/2000/svg';svg.replaceChildren();
+  el('call-chart').classList.toggle('hide',calls.length===0);
+  const max=Math.max(...calls.map(c=>c.usage?.output_tokens??0),1),step=300/Math.max(calls.length,1);
+  svg.setAttribute('aria-label','最近调用输出 Token，旧到新：'+calls.map(c=>fmt(c.usage?.output_tokens)).join('，'));
+  calls.forEach((c,i)=>{const value=c.usage?.output_tokens;
+    const rect=document.createElementNS(ns,'rect');const height=value==null?2:value/max*36;
+    rect.setAttribute('x',String(i*step+2));rect.setAttribute('y',String(40-height));rect.setAttribute('width',String(Math.max(1,step-4)));rect.setAttribute('height',String(height));rect.setAttribute('rx','1.5');rect.setAttribute('fill',value==null?'var(--line)':'currentColor');rect.setAttribute('opacity',value==null?'1':'.75');
+    const title=document.createElementNS(ns,'title');title.textContent=time(c.recordedAt)+' · '+fmt(value)+' 输出 Token';rect.append(title);svg.append(rect);
+  });
 }
 function renderTurns(turns,summary){
   set('turns-count',turns.length+' / 10 轮');set('ttft-mean',seconds(summary.ttftMeanMs)+' 秒');set('ttft-median','中位数 '+seconds(summary.ttftMedianMs)+' 秒 · '+(summary.ttftSamples||0)+' 个有效样本');
@@ -81,7 +95,7 @@ el('scope').onchange=()=>snapshot&&snapshot.id===threadId&&render(snapshot);
 el('refresh-sessions').onclick=()=>!preview&&loadSessions();
 el('sessions').onchange=()=>{const selected=el('sessions').value;if(selected){threadId=selected;set('live','切换中');poll();}};
 if(preview){connected=true;poll();}else{
-  app=new App({name:'会话指标',version:'0.1.10'});
+  app=new App({name:'会话指标',version:'0.1.11'});
   app.ontoolresult=r=>{const d=r.structuredContent;if(!d)return;if(d.threadId)currentThreadId=d.threadId;if(d.sessions)showSessions(d.sessions);if(d.snapshot)render(d.snapshot);else if(d.threadId){threadId=d.threadId;poll();}else if(d.needsBinding){set('live','请选择会话');set('binding-note','选择会话名称后查看指标。');}};
   app.onhostcontextchanged=ctx=>{if(ctx.theme)applyDocumentTheme(ctx.theme);};app.onteardown=async()=>{stopped=true;return {};};
   try{await app.connect();connected=true;const ctx=app.getHostContext();if(ctx?.theme)applyDocumentTheme(ctx.theme);if(!threadId)set('live','请选择会话');await loadSessions();poll();}catch(e){error(e);}
