@@ -1,0 +1,10 @@
+{
+  "name": "local-session-metrics",
+  "interface": {"displayName": "会话指标"},
+  "plugins": [{
+    "name": "codex-session-metrics",
+    "source": {"source": "local", "path": "./"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+    "category": "Productivity"
+  }]
+}

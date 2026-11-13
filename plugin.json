@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-session-metrics",
+  "version": "0.1.3",
+  "description": "当前聊天的 Token、上下文、TTFT 和 TPS 实时面板，支持 custom 网关。",
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true,
+      "interface": {
+        "displayName": "会话指标",
+        "shortDescription": "实时 Token · 上下文 · TTFT · TPS",
+        "developerName": "Local tools",
+        "category": "Productivity",
+        "capabilities": [
+          "Read"
+        ],
+        "brandColor": "#16a388"
+      }
+    }
+  }
+}
