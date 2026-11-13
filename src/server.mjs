@@ -5,15 +5,15 @@ import {readFile} from 'node:fs/promises';
 import {createServer} from 'node:http';
 import {SessionStore,UUID} from './store.mjs';
 import {ensureProxy} from './ensure-proxy.mjs';
+import {metadataThread} from './thread-context.mjs';
 if(!process.argv.includes('--preview'))await ensureProxy();
 const store=new SessionStore();
 const html=await readFile(new URL('./panel.html',import.meta.url),'utf8');
-const uri='ui://session-metrics/panel-v5.html';
-const server=new McpServer({name:'会话指标',version:'0.1.5'},{capabilities:{tools:{},resources:{}}});
+const uri='ui://session-metrics/panel-v6.html';
+const server=new McpServer({name:'会话指标',version:'0.1.6'},{capabilities:{tools:{},resources:{}}});
 const result=d=>({content:[],structuredContent:d});
-function metadataThread(extra){const m=extra?._meta||{};return [m['openai/threadId'],m['openai/thread_id'],m['openai/conversationId']].find(x=>typeof x==='string'&&UUID.test(x));}
 server.registerResource('session-metrics-ui',uri,{},async()=>({contents:[{uri,mimeType:'text/html;profile=mcp-app',text:html,_meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}}}]}));
-server.registerTool('open_metrics',{title:'会话指标',description:'打开当前聊天的实时 Token、上下文、TTFT 和 TPS 面板。调用时传入当前 thread_id，以精确绑定会话。',inputSchema:{thread_id:z.string().regex(UUID).optional()},annotations:{readOnlyHint:true,openWorldHint:false},_meta:{ui:{resourceUri:uri},'openai/ui':{entrypoints:[{type:'thread'}]}}},async({thread_id},extra)=>{const id=thread_id||metadataThread(extra);return result({threadId:id||null,snapshot:id?await store.snapshot(id):null,needsBinding:!id,sessions:await store.list(id)});});
+server.registerTool('open_metrics',{title:'statusx · 会话指标',description:'桌面端直接打开当前会话指标，使用宿主请求元数据自动绑定当前聊天，无需模型参与。',inputSchema:{thread_id:z.string().regex(UUID).optional()},annotations:{readOnlyHint:true,openWorldHint:false},_meta:{ui:{resourceUri:uri,visibility:['app']},'openai/ui':{entrypoints:[{type:'thread'}]}}},async({thread_id},extra)=>{const id=metadataThread(extra)||thread_id;return result({threadId:id||null,snapshot:id?await store.snapshot(id):null,needsBinding:!id,sessions:await store.list(id)});});
 server.registerTool('read_metrics',{title:'读取会话指标',description:'读取指定本地会话的指标；供面板自动刷新。',inputSchema:{thread_id:z.string().regex(UUID)},annotations:{readOnlyHint:true,openWorldHint:false},_meta:{ui:{visibility:['app']}}},async({thread_id})=>result(await store.snapshot(thread_id)));
 server.registerTool('list_sessions',{title:'选择本机会话',description:'列出最近本地会话名称及更新时间，不返回聊天正文。',inputSchema:{thread_id:z.string().regex(UUID).optional()},annotations:{readOnlyHint:true,openWorldHint:false},_meta:{ui:{visibility:['app']}}},async({thread_id})=>result({sessions:await store.list(thread_id)}));
 if(process.argv.includes('--preview')){

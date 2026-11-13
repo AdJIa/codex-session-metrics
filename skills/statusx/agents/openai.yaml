@@ -1,4 +1,0 @@
-interface:
-  display_name: "statusx"
-  short_description: "打开当前会话指标，查看 Token、上下文及近十次 TTFT/TPS 均值"
-  default_prompt: "使用 $statusx 打开并展开当前会话的实时指标面板。"

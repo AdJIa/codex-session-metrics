@@ -33,7 +33,7 @@ el('scope').onchange=()=>snapshot&&snapshot.id===threadId&&render(snapshot);
 el('refresh-sessions').onclick=()=>!preview&&loadSessions();
 el('sessions').onchange=()=>{const selected=el('sessions').value;if(selected){threadId=selected;set('live','切换中');poll();}};
 if(preview){connected=true;poll();}else{
-  app=new App({name:'会话指标',version:'0.1.5'});
+  app=new App({name:'会话指标',version:'0.1.6'});
   app.ontoolresult=r=>{const d=r.structuredContent;if(!d)return;if(d.threadId)currentThreadId=d.threadId;if(d.sessions)showSessions(d.sessions);if(d.snapshot)render(d.snapshot);else if(d.threadId){threadId=d.threadId;poll();}else if(d.needsBinding){set('live','请选择会话');set('binding-note','选择会话名称后查看指标。');}};
   app.onhostcontextchanged=ctx=>{if(ctx.theme)applyDocumentTheme(ctx.theme);};app.onteardown=async()=>{stopped=true;return {};};
   try{await app.connect();connected=true;const ctx=app.getHostContext();if(ctx?.theme)applyDocumentTheme(ctx.theme);if(!threadId)set('live','请选择会话');await loadSessions();poll();}catch(e){error(e);}

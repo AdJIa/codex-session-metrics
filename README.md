@@ -5,13 +5,13 @@
 
 Codex 桌面端本地插件：在当前聊天中查看 Token 用量、上下文快照，以及最近 10 次模型调用的平均 TTFT 和 TPS。适用于使用 custom 网关的本地会话，不依赖订阅额度接口。
 
-- 输入 /statusx，在技能菜单选择 statusx 并发送；也可使用 $statusx。
+- 从当前会话的插件面板入口点击 **statusx · 会话指标**，由宿主直接执行并打开。
 - 展示当前轮、整个会话、最近请求的输入、输出、缓存及推理 Token，以及缓存输入占输入的百分比。
-- 面板每秒刷新；刷新不调用模型，唤起技能本身会经过一次助手调用。
-- 显式绑定当前会话 ID，避免多个聊天串用统计数据。
+- 打开、切换会话和每秒刷新均走本地 MCP，不调用 AI 模型。
+- 从桌面端调用元数据自动绑定当前会话，避免多个聊天串用统计数据。
 - 可选本地流式代理收集 TTFT/TPS，原 API Key 保持不变。
 
-> 当前为实验版本。MCP、日志解析、代理及滚动平均已通过自动化测试；桌面端最终展示位置与斜杠菜单名称取决于宿主，尚未完成原生 UI 端到端验收。
+> 当前为实验版本。MCP、日志解析、代理及滚动平均已通过自动化测试；桌面端最终展示位置取决于宿主，尚未完成原生 UI 端到端验收。
 
 ## 安装
 
@@ -24,9 +24,15 @@ codex plugin marketplace add "$PWD"
 codex plugin add codex-session-metrics@local-session-metrics
 ```
 
-完全退出并重新打开 Codex。输入 /statusx，从菜单选择对应技能并发送。菜单可能显示插件命名空间；也可以输入 $statusx，或发送“用会话指标插件打开当前会话的指标面板”。
+完全退出并重新打开 Codex，在当前会话的插件面板入口选择 **statusx · 会话指标**。此入口由宿主直接打开，不发送聊天消息、不经过模型。
 
-命令会调用 open_metrics 并传入当前 thread_id，请求展开显示。若宿主只显示聊天卡片，可使用宿主的展开控件。默认绑定当前会话，绑定区域使用会话名称下拉列表，选择其他会话名称即可切换，无需粘贴 ID。名称来自本地 session_index.jsonl；缺少名称时显示“未命名会话”。宿主未提供可靠的当前会话信息时，需从列表选择，不自动猜测最近活跃聊天。远程会话需要在日志所在的主机运行插件。
+宿主调用 open_metrics 时传入空参数，并在请求元数据 thread_id / threadId 中携带当前会话；插件据此立即读取并展示指标。绑定区域仍支持按会话名称切换，名称来自本地 session_index.jsonl，缺少名称时显示“未命名会话”。未提供可靠元数据的旧宿主需从列表选择，不自动猜测最近活跃聊天。远程会话需要在日志所在的主机运行插件。
+
+### 关于 /statusx
+
+0.1.6 已移除原来的 statusx 技能入口，避免打开面板时触发模型。当前公开的桌面插件接口支持原生会话面板入口，未提供将自定义 /statusx 注册为内置命令的接口，因此本插件不宣称实现了原生斜杠命令。原生面板入口满足点击直开、自动绑定和零模型调用；自定义斜杠或快捷键仍需要宿主提供命令注册能力。
+
+参考：[原生插件入口](https://developers.openai.com/plugins/build/extensions)、[宿主斜杠命令](https://learn.chatgpt.com/docs/reference/slash-commands)。
 
 ## 启用 TTFT / TPS
 
@@ -65,7 +71,7 @@ python3 scripts/timing.py --disable
 - 按兼容协议从输出中扣除推理 Token；网关口径不同需要适配。缺少 usage 时以 o200k_base 估算，其他 tokenizer 可能有偏差。
 - 代理需从 thread_id、x-codex-thread-id、session_id 或 x-codex-session-id 请求头取得 UUID。网关或客户端未提供可靠 ID 时，不会把计时随意归入会话。
 - 当前转发保留请求路径，适用于 /v1 等路径一致的网关；需要路径重写的网关须另行适配。
-- /statusx 是插件内置技能入口，不是对桌面端任意裸斜杠命令的注册。
+- statusx 是原生会话面板的显示名称，当前插件 API 不支持注册自定义内置斜杠命令。
 
 ## 数据与隐私
 
@@ -88,6 +94,6 @@ npm test
 - src/proxy.mjs、src/stream.mjs：流式转发和计时。
 - src/averages.mjs：最近 10 次完成调用的滚动均值。
 - web/：面板界面，构建为自包含 HTML。
-- skills/statusx/：当前会话唤起技能。
+- src/thread-context.mjs：从宿主 MCP 请求元数据解析当前会话。
 
 MIT 许可证适用于本项目源代码；依赖包保留其各自许可证。详见 [LICENSE](LICENSE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

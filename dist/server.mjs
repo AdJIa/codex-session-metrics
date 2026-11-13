@@ -36842,20 +36842,33 @@ async function ensureProxy() {
   await log.close();
 }
 
+// src/thread-context.mjs
+function metadataThread(extra) {
+  const meta3 = extra?._meta || {};
+  for (const key of ["thread_id", "threadId", "openai/threadId", "openai/thread_id", "codexThreadId", "codex_thread_id", "openai/conversationId"]) {
+    if (typeof meta3[key] === "string" && UUID.test(meta3[key])) return meta3[key];
+  }
+  let turn = meta3["x-codex-turn-metadata"];
+  if (typeof turn === "string") {
+    try {
+      turn = JSON.parse(turn);
+    } catch {
+      return null;
+    }
+  }
+  return typeof turn?.thread_id === "string" && UUID.test(turn.thread_id) ? turn.thread_id : null;
+}
+
 // src/server.mjs
 if (!process.argv.includes("--preview")) await ensureProxy();
 var store = new SessionStore();
 var html = await readFile3(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v5.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.5" }, { capabilities: { tools: {}, resources: {} } });
+var uri = "ui://session-metrics/panel-v6.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.6" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
-function metadataThread(extra) {
-  const m = extra?._meta || {};
-  return [m["openai/threadId"], m["openai/thread_id"], m["openai/conversationId"]].find((x) => typeof x === "string" && UUID.test(x));
-}
 server.registerResource("session-metrics-ui", uri, {}, async () => ({ contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen" } } }] }));
-server.registerTool("open_metrics", { title: "\u4F1A\u8BDD\u6307\u6807", description: "\u6253\u5F00\u5F53\u524D\u804A\u5929\u7684\u5B9E\u65F6 Token\u3001\u4E0A\u4E0B\u6587\u3001TTFT \u548C TPS \u9762\u677F\u3002\u8C03\u7528\u65F6\u4F20\u5165\u5F53\u524D thread_id\uFF0C\u4EE5\u7CBE\u786E\u7ED1\u5B9A\u4F1A\u8BDD\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {
-  const id = thread_id || metadataThread(extra);
+server.registerTool("open_metrics", { title: "statusx \xB7 \u4F1A\u8BDD\u6307\u6807", description: "\u684C\u9762\u7AEF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD\u6307\u6807\uFF0C\u4F7F\u7528\u5BBF\u4E3B\u8BF7\u6C42\u5143\u6570\u636E\u81EA\u52A8\u7ED1\u5B9A\u5F53\u524D\u804A\u5929\uFF0C\u65E0\u9700\u6A21\u578B\u53C2\u4E0E\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri, visibility: ["app"] }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {
+  const id = metadataThread(extra) || thread_id;
   return result({ threadId: id || null, snapshot: id ? await store.snapshot(id) : null, needsBinding: !id, sessions: await store.list(id) });
 });
 server.registerTool("read_metrics", { title: "\u8BFB\u53D6\u4F1A\u8BDD\u6307\u6807", description: "\u8BFB\u53D6\u6307\u5B9A\u672C\u5730\u4F1A\u8BDD\u7684\u6307\u6807\uFF1B\u4F9B\u9762\u677F\u81EA\u52A8\u5237\u65B0\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID) }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { visibility: ["app"] } } }, async ({ thread_id }) => result(await store.snapshot(thread_id)));

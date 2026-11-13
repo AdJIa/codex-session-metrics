@@ -11,10 +11,15 @@ test('built MCP server advertises native thread panel and returns live bound met
  await writeFile(join(home,'session_index.jsonl'),JSON.stringify({id:fixtureId,thread_name:'测试会话名称'})+'\n');
  const c=new Client({name:'test',version:'1'});const t=new StdioClientTransport({command:process.execPath,args:['dist/server.mjs'],env:{...process.env,CODEX_HOME:home},stderr:'pipe'});
  try{await c.connect(t);const tools=await c.listTools();const open=tools.tools.find(t=>t.name==='open_metrics');assert.equal(open._meta['openai/ui'].entrypoints[0].type,'thread');
+ assert.deepEqual(open._meta.ui.visibility,['app']);
  const r=await c.callTool({name:'open_metrics',arguments:{}});assert.equal(r.structuredContent.needsBinding,true);
  const list=await c.callTool({name:'list_sessions',arguments:{}});const id=list.structuredContent.sessions[0].id;
  const bound=await c.callTool({name:'open_metrics',arguments:{thread_id:id}});assert.equal(bound.structuredContent.threadId,id);assert.equal(bound.structuredContent.snapshot.id,id);assert.equal(bound.structuredContent.needsBinding,false);
  assert.equal(bound.structuredContent.snapshot.title,'测试会话名称');assert.equal(bound.structuredContent.sessions[0].title,'测试会话名称');
+ // Native desktop entrypoints send {} and carry the active thread in _meta.
+ const native=await c.callTool({name:'open_metrics',arguments:{},_meta:{thread_id:id,threadId:id}});assert.equal(native.structuredContent.threadId,id);assert.equal(native.structuredContent.snapshot.title,'测试会话名称');assert.equal(native.structuredContent.needsBinding,false);
+ const second='66666666-6666-6666-6666-666666666666';
+ const isolated=await c.callTool({name:'open_metrics',arguments:{thread_id:second},_meta:{thread_id:id}});assert.equal(isolated.structuredContent.threadId,id);
  const snap=await c.callTool({name:'read_metrics',arguments:{thread_id:id}});assert.equal(snap.structuredContent.id,id);
  const ui=await c.readResource({uri:open._meta.ui.resourceUri});assert.match(ui.contents[0].text,/会话指标/);assert.equal(ui.contents[0]._meta['openai/ui'].preferredDisplayMode,'fullscreen');
  assert.doesNotMatch(ui.contents[0].text,/<input[^>]*id="thread-id"/);
