@@ -1,14 +1,14 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-session-metrics",
-  "version": "0.1.6",
-  "description": "当前聊天的 Token、上下文、TTFT 和 TPS 实时面板，支持 custom 网关。",
+  "version": "0.1.7",
+  "description": "仅读取 Codex 自身记录的会话指标面板：Token、缓存占比、上下文和最近 10 次模型调用。",
   "extensions": {
     "com.openai": {
       "requires_local_executor": true,
       "interface": {
         "displayName": "会话指标",
-        "shortDescription": "实时 Token · 上下文 · TTFT · TPS",
+        "shortDescription": "Token · 缓存占比 · 上下文 · 最近调用",
         "developerName": "Local tools",
         "category": "Productivity",
         "capabilities": [

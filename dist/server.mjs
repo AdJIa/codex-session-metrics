@@ -36652,7 +36652,7 @@ var StdioServerTransport = class {
 };
 
 // src/server.mjs
-import { readFile as readFile3 } from "node:fs/promises";
+import { readFile as readFile2 } from "node:fs/promises";
 import { createServer } from "node:http";
 
 // src/store.mjs
@@ -36721,14 +36721,14 @@ var SessionStore = class {
     return recent;
   }
   async snapshot(id) {
-    if (!UUID.test(id || "")) throw new Error("\u8BF7\u9009\u62E9\u6216\u8F93\u5165\u6709\u6548\u7684\u4F1A\u8BDD ID");
+    if (!UUID.test(id || "")) throw new Error("\u8BF7\u4ECE\u5217\u8868\u4E2D\u9009\u62E9\u6709\u6548\u4F1A\u8BDD");
     await this.discover();
     const file2 = this.files.get(id);
     if (!file2) throw new Error("\u672C\u673A\u672A\u627E\u5230\u8BE5\u4F1A\u8BDD\u8BB0\u5F55\uFF1B\u8FDC\u7A0B\u4F1A\u8BDD\u9700\u8981\u5728\u5BF9\u5E94\u4E3B\u673A\u8FD0\u884C\u63D2\u4EF6\u3002");
     const s = await stat(file2);
     let c = this.cache.get(id);
     if (!c || s.size < c.offset) {
-      c = { offset: 0, pending: "", decoder: new StringDecoder("utf8"), state: { id, model: null, provider: null, window: null, last: null, total: null, turn: null, turnId: null, active: false, startedAt: null, ttftMs: null, ttftTurnId: null, requests: 0, compactions: 0, updatedAt: null }, seen: /* @__PURE__ */ new Set() };
+      c = { offset: 0, pending: "", decoder: new StringDecoder("utf8"), state: { id, model: null, provider: null, window: null, last: null, total: null, turn: null, turnId: null, active: false, startedAt: null, ttftMs: null, ttftTurnId: null, requests: 0, compactions: 0, updatedAt: null, recentCalls: [] }, seen: /* @__PURE__ */ new Set(), hasUsageRecords: false, lastLegacyTotal: null };
       this.cache.set(id, c);
     }
     if (s.size > c.offset) {
@@ -36754,7 +36754,7 @@ var SessionStore = class {
     }
     const st = c.state;
     const used = st.last?.total_tokens ?? null;
-    return { ...st, title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: await this.timing(id) };
+    return { ...st, title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: { source: "codex", recordedCalls: st.recentCalls.length, ttftUnavailableReason: "Codex \u8C03\u7528\u8BB0\u5F55\u672A\u4FDD\u5B58\u9010\u6B21 TTFT", tpsUnavailableReason: "Codex \u8C03\u7528\u8BB0\u5F55\u672A\u4FDD\u5B58\u8F93\u51FA\u65F6\u957F", average: { window: 10, calls: st.recentCalls.length, ttftMs: null, ttftSamples: 0, tps: null, tpsSamples: 0 } } };
   }
   apply(c, r) {
     const p = r.payload || {}, s = c.state;
@@ -36768,10 +36768,17 @@ var SessionStore = class {
       return;
     }
     if (r.type === "token_usage_record") {
-      const rid = p.response_id || String(r.ordinal);
+      if (!c.hasUsageRecords) {
+        c.hasUsageRecords = true;
+        s.recentCalls = [];
+        s.requests = 0;
+        c.seen.clear();
+      }
+      const rid = p.response_id || "ordinal:" + r.ordinal;
       if (!c.seen.has(rid)) {
         s.requests++;
         c.seen.add(rid);
+        s.recentCalls = [...s.recentCalls, { responseId: p.response_id || null, turnId: p.turn_id || s.turnId, recordedAt: r.timestamp || null, model: s.model, usage: usage(p.usage), source: "token_usage_record" }].slice(-10);
       }
       s.last = usage(p.usage);
       s.total = usage(p.thread_token_usage);
@@ -36797,50 +36804,15 @@ var SessionStore = class {
       s.total = usage(p.info.total_token_usage);
       s.last = usage(p.info.last_token_usage);
       s.window = p.info.model_context_window || s.window;
-    }
-  }
-  async timing(id) {
-    try {
-      return JSON.parse(await readFile(join(this.home, "session-metrics", id + ".json"), "utf8"));
-    } catch {
-      return null;
+      const total = p.info.total_token_usage?.total_tokens;
+      if (!c.hasUsageRecords && Number.isFinite(total) && total > 0 && total !== c.lastLegacyTotal) {
+        c.lastLegacyTotal = total;
+        s.requests++;
+        s.recentCalls = [...s.recentCalls, { responseId: null, turnId: s.turnId, recordedAt: r.timestamp || null, model: s.model, usage: s.last, source: "token_count" }].slice(-10);
+      }
     }
   }
 };
-
-// src/ensure-proxy.mjs
-import { readFile as readFile2, open as open3 } from "node:fs/promises";
-import { join as join2 } from "node:path";
-import { homedir as homedir2 } from "node:os";
-import { createConnection } from "node:net";
-import { spawn } from "node:child_process";
-async function ensureProxy() {
-  const home = process.env.CODEX_HOME || join2(homedir2(), ".codex");
-  let state;
-  try {
-    state = JSON.parse(await readFile2(join2(home, "session-metrics", "timing-install.json"), "utf8"));
-  } catch {
-    return;
-  }
-  if (!state.enabled) return;
-  const alive = await new Promise((resolve) => {
-    const s = createConnection({ host: "127.0.0.1", port: 43188 });
-    s.on("connect", () => {
-      s.destroy();
-      resolve(true);
-    });
-    s.on("error", () => resolve(false));
-    s.setTimeout(500, () => {
-      s.destroy();
-      resolve(false);
-    });
-  });
-  if (alive) return;
-  const log = await open3(join2(home, "session-metrics", "proxy.log"), "a", 384);
-  const child = spawn(process.execPath, [new URL("./proxy.mjs", import.meta.url).pathname], { env: { ...process.env, METRICS_UPSTREAM: state.upstream, METRICS_PROXY_PORT: "43188" }, detached: true, stdio: ["ignore", log.fd, log.fd] });
-  child.unref();
-  await log.close();
-}
 
 // src/thread-context.mjs
 function metadataThread(extra) {
@@ -36860,11 +36832,10 @@ function metadataThread(extra) {
 }
 
 // src/server.mjs
-if (!process.argv.includes("--preview")) await ensureProxy();
 var store = new SessionStore();
-var html = await readFile3(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v6.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.6" }, { capabilities: { tools: {}, resources: {} } });
+var html = await readFile2(new URL("./panel.html", import.meta.url), "utf8");
+var uri = "ui://session-metrics/panel-v7.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.7" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
 server.registerResource("session-metrics-ui", uri, {}, async () => ({ contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen" } } }] }));
 server.registerTool("open_metrics", { title: "statusx \xB7 \u4F1A\u8BDD\u6307\u6807", description: "\u684C\u9762\u7AEF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD\u6307\u6807\uFF0C\u4F7F\u7528\u5BBF\u4E3B\u8BF7\u6C42\u5143\u6570\u636E\u81EA\u52A8\u7ED1\u5B9A\u5F53\u524D\u804A\u5929\uFF0C\u65E0\u9700\u6A21\u578B\u53C2\u4E0E\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri, visibility: ["app"] }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {
