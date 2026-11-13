@@ -8,6 +8,8 @@ Codex 桌面端本地指标插件，仅读取 Codex 自身保存的会话记录�
 - Token：当前轮、整个会话、最近请求的输入、输出、缓存及推理用量。
 - 缓存输入占比：所选范围的缓存输入 / 输入 Token。
 - 上下文快照：最近请求 Token / 记录的模型窗口。
+- TTFT：最近完成轮次的首 Token 延迟。
+- TPS：最近完成轮次的累计输出 Token / 整轮耗时。
 - 最近调用：展示最近 10 次已结算模型调用，不足 10 次展示已有记录。
 - 绑定会话：默认从宿主元数据绑定当前会话，支持按会话名称切换。
 
@@ -26,15 +28,15 @@ codex plugin add codex-session-metrics@local-session-metrics
 
 插件从请求元数据 thread_id / threadId 读取当前会话；旧宿主未提供可靠元数据时，可从会话名称列表选择，不自动猜测最近活跃聊天。名称读取自 session_index.jsonl；无名称时显示“未命名会话”。远程会话须在日志所在主机运行插件。
 
-## TTFT / TPS 的数据边界
+## TTFT / TPS 的统计口径
 
-**当前 Codex 的逐次调用记录仅包含响应 ID 和 Token usage，没有逐次请求起点、首 Token 到达时间或首尾输出时间。因此只读取这些现有记录，无法可靠计算逐次 TTFT 和 TPS，也无法计算近 10 次均值。**
+**两项主卡片均展示最近完成轮次的数据。** 本轮仍在进行时保留上一轮结果，结束后自动更新；取消的轮次不替换已完成结果。
 
-面板明确显示“Codex 未保存逐次 TTFT / 输出时长”，并展示真实读取的调用数量与明细。缺失数据不当作零；不会用相邻日志时间差、工具执行时间或整轮耗时冒充模型输出时长。
+TTFT 直接读取 task_complete.time_to_first_token_ms。TPS = 同轮累计 output_tokens / (task_complete.duration_ms / 1000)，没有 duration_ms 时使用该轮完成与开始时间差。输出用量优先使用 turn_token_usage，缺失时累加同轮去重后的调用用量；旧版仅有 token_count 时使用该轮前后的累计输出差值。
 
-部分 Codex 版本保存 task_complete.time_to_first_token_ms，它是整轮对话的 TTFT。面板单独显示最近完成轮次的该值，并明确标注“整轮数据，非逐次调用均值”。
+TPS 衡量整轮平均吞吐，耗时包含模型请求、工具执行和等待；与纯模型解码速度口径不同。界面同时展示计算所用的输出 Token 与耗时。缺少数据或时长为零时显示 —，真实零输出则显示 0。
 
-最近 10 次调用按 token_usage_record 的 response_id 去重，排除尚未结算的请求；没有该记录的旧版 Codex 则读取 token_count，仅在累计用量变化时新增记录。来源格式会随 Codex 版本变化。当前版本不承诺提供缺少源数据的耗时指标。
+最近 10 次模型调用明细独立保留，按 token_usage_record 的 response_id 去重，排除尚未结算的请求；没有该记录的旧版 Codex 则读取 token_count，仅在累计用量变化时新增记录。当前日志不保存逐次请求与首尾输出时间，主卡片使用上述轮次口径。
 
 ## 指标定义
 
@@ -44,8 +46,8 @@ codex plugin add codex-session-metrics@local-session-metrics
 | 缓存占比 | 缓存输入 / 输入 Token；输入为零或缺失时显示 — |
 | 上下文 | 最近请求输入 + 输出 Token / 模型窗口，属于近似快照 |
 | 最近调用 | 近 10 次已结算调用的时间、输入、输出和缓存占比 |
-| TTFT / TPS | 当前逐次记录缺少必要时间字段，显示不可用原因 |
-| 整轮 TTFT | 有 task_complete.time_to_first_token_ms 时单独展示 |
+| TTFT | 最近完成轮次的 task_complete.time_to_first_token_ms |
+| TPS | 最近完成轮次累计输出 Token / 整轮耗时，含工具与等待 |
 
 ## 从 0.1.6 及更早版本升级
 

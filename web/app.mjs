@@ -5,11 +5,12 @@ let threadId=null,snapshot=null,stopped=false,busy=false,app=null,connected=fals
 const preview=location.protocol==='http:'&&location.hostname==='127.0.0.1';
 function error(e){set('error',e?.message||String(e));el('error').classList.remove('hide');set('live','连接异常');}
 function render(s){snapshot=s;threadId=s.id;el('error').classList.add('hide');set('live',s.active?'本轮进行中':'已同步');set('context',s.contextPercent==null?'—':s.contextPercent.toFixed(1)+'%');el('fill').style.width=Math.min(100,s.contextPercent||0)+'%';el('progress').setAttribute('aria-valuenow',String(s.contextPercent||0));set('capacity',fmt(s.contextUsed)+' / '+fmt(s.window)+' tokens');set('remaining',s.window&&s.contextUsed!=null?'剩余 '+fmt(Math.max(0,s.window-s.contextUsed)):'—');
-  const count=s.recentCalls?.length||0;
-  set('ttft','—');set('tps','—');
-  set('ttft-note',count?'已读取 '+count+' 次调用 · Codex 未保存逐次 TTFT':'暂无模型调用记录');
-  set('tps-note',count?'已读取 '+count+' 次调用 · Codex 未保存输出时长':'暂无模型调用记录');
-  set('turn-ttft',s.ttftMs!=null?'最近完成轮次的 TTFT：'+(s.ttftMs/1000).toFixed(2)+' 秒（整轮数据，非逐次调用均值）':'');
+  const turn=s.latestCompletedTurn;
+  set('ttft',turn?.ttftMs!=null?(turn.ttftMs/1000).toFixed(2):'—');
+  set('tps',turn?.tps!=null?turn.tps.toFixed(1):'—');
+  const completed=turn?.completedAt?new Date(turn.completedAt).toLocaleString('zh-CN',{hour12:false}):'完成时间未记录';
+  set('ttft-note',turn?turn.ttftMs!=null?'完成于 '+completed:'该轮未记录 TTFT':'暂无已完成轮次');
+  set('tps-note',turn?turn.tps!=null?fmt(turn.outputTokens)+' 输出 Token ÷ '+(turn.durationMs/1000).toLocaleString('zh-CN',{maximumFractionDigits:2})+' 秒（整轮）':'该轮缺少有效耗时或输出用量':'暂无已完成轮次');
   renderCalls(s.recentCalls||[]);
   const u=s[el('scope').value];set('input',fmt(u?.input_tokens));set('output',fmt(u?.output_tokens));set('cached',fmt(u?.cached_input_tokens));const cachePercent=Number.isFinite(u?.input_tokens)&&u.input_tokens>0&&Number.isFinite(u?.cached_input_tokens)?u.cached_input_tokens/u.input_tokens*100:null;set('cache-ratio',cachePercent==null?'—':cachePercent.toFixed(1)+'%');set('reasoning','推理 '+fmt(u?.reasoning_output_tokens));set('requests','会话请求 '+fmt(s.requests));set('model',(s.model||'未知模型')+' · '+(s.provider||'未知提供商'));syncSelection(s);set('updated',new Date(s.sampledAt).toLocaleTimeString('zh-CN',{hour12:false}));}
 function renderCalls(calls){
@@ -43,7 +44,7 @@ el('scope').onchange=()=>snapshot&&snapshot.id===threadId&&render(snapshot);
 el('refresh-sessions').onclick=()=>!preview&&loadSessions();
 el('sessions').onchange=()=>{const selected=el('sessions').value;if(selected){threadId=selected;set('live','切换中');poll();}};
 if(preview){connected=true;poll();}else{
-  app=new App({name:'会话指标',version:'0.1.7'});
+  app=new App({name:'会话指标',version:'0.1.8'});
   app.ontoolresult=r=>{const d=r.structuredContent;if(!d)return;if(d.threadId)currentThreadId=d.threadId;if(d.sessions)showSessions(d.sessions);if(d.snapshot)render(d.snapshot);else if(d.threadId){threadId=d.threadId;poll();}else if(d.needsBinding){set('live','请选择会话');set('binding-note','选择会话名称后查看指标。');}};
   app.onhostcontextchanged=ctx=>{if(ctx.theme)applyDocumentTheme(ctx.theme);};app.onteardown=async()=>{stopped=true;return {};};
   try{await app.connect();connected=true;const ctx=app.getHostContext();if(ctx?.theme)applyDocumentTheme(ctx.theme);if(!threadId)set('live','请选择会话');await loadSessions();poll();}catch(e){error(e);}

@@ -36663,6 +36663,19 @@ import { StringDecoder } from "node:string_decoder";
 var UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 var keys = ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens"];
 var usage = (u) => Object.fromEntries(keys.map((k) => [k, Number.isFinite(u?.[k]) ? u[k] : 0]));
+var nonnegative = (v) => Number.isFinite(v) && v >= 0 ? v : null;
+var timestamp = (v) => {
+  const ms = typeof v === "number" ? v * 1e3 : Date.parse(v);
+  return Number.isFinite(ms) ? ms : null;
+};
+function completedTurn(p, r, turn) {
+  const startedAt = timestamp(p.started_at) ?? turn?.startedAt ?? null;
+  const completedAt = timestamp(p.completed_at) ?? timestamp(r.timestamp);
+  const elapsed = startedAt != null && completedAt != null ? nonnegative(completedAt - startedAt) : null;
+  const durationMs = nonnegative(p.duration_ms) ?? elapsed;
+  const outputTokens = turn?.nativeOutput ?? turn?.summedOutput ?? turn?.legacyOutput ?? null;
+  return { turnId: p.turn_id || turn?.id || null, startedAt: startedAt != null ? new Date(startedAt).toISOString() : null, completedAt: completedAt != null ? new Date(completedAt).toISOString() : null, ttftMs: nonnegative(p.time_to_first_token_ms), durationMs, outputTokens, tps: outputTokens != null && durationMs > 0 ? outputTokens / (durationMs / 1e3) : null, tpsBasis: "\u8BE5\u8F6E\u7D2F\u8BA1\u8F93\u51FA Token \xF7 \u6574\u8F6E\u8017\u65F6\uFF08\u542B\u5DE5\u5177\u6267\u884C\u548C\u7B49\u5F85\uFF09" };
+}
 var SessionStore = class {
   constructor(home = process.env.CODEX_HOME || join(homedir(), ".codex")) {
     this.home = home;
@@ -36728,7 +36741,7 @@ var SessionStore = class {
     const s = await stat(file2);
     let c = this.cache.get(id);
     if (!c || s.size < c.offset) {
-      c = { offset: 0, pending: "", decoder: new StringDecoder("utf8"), state: { id, model: null, provider: null, window: null, last: null, total: null, turn: null, turnId: null, active: false, startedAt: null, ttftMs: null, ttftTurnId: null, requests: 0, compactions: 0, updatedAt: null, recentCalls: [] }, seen: /* @__PURE__ */ new Set(), hasUsageRecords: false, lastLegacyTotal: null };
+      c = { offset: 0, pending: "", decoder: new StringDecoder("utf8"), state: { id, model: null, provider: null, window: null, last: null, total: null, turn: null, turnId: null, active: false, startedAt: null, ttftMs: null, ttftTurnId: null, latestCompletedTurn: null, requests: 0, compactions: 0, updatedAt: null, recentCalls: [] }, seen: /* @__PURE__ */ new Set(), hasUsageRecords: false, lastLegacyTotal: null, currentTurn: null };
       this.cache.set(id, c);
     }
     if (s.size > c.offset) {
@@ -36754,7 +36767,7 @@ var SessionStore = class {
     }
     const st = c.state;
     const used = st.last?.total_tokens ?? null;
-    return { ...st, title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: { source: "codex", recordedCalls: st.recentCalls.length, ttftUnavailableReason: "Codex \u8C03\u7528\u8BB0\u5F55\u672A\u4FDD\u5B58\u9010\u6B21 TTFT", tpsUnavailableReason: "Codex \u8C03\u7528\u8BB0\u5F55\u672A\u4FDD\u5B58\u8F93\u51FA\u65F6\u957F", average: { window: 10, calls: st.recentCalls.length, ttftMs: null, ttftSamples: 0, tps: null, tpsSamples: 0 } } };
+    return { ...st, title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: { source: "codex", recordedCalls: st.recentCalls.length, latestCompletedTurn: st.latestCompletedTurn } };
   }
   apply(c, r) {
     const p = r.payload || {}, s = c.state;
@@ -36775,10 +36788,18 @@ var SessionStore = class {
         c.seen.clear();
       }
       const rid = p.response_id || "ordinal:" + r.ordinal;
-      if (!c.seen.has(rid)) {
+      const isNew = !c.seen.has(rid);
+      if (isNew) {
         s.requests++;
         c.seen.add(rid);
         s.recentCalls = [...s.recentCalls, { responseId: p.response_id || null, turnId: p.turn_id || s.turnId, recordedAt: r.timestamp || null, model: s.model, usage: usage(p.usage), source: "token_usage_record" }].slice(-10);
+      }
+      const turn = c.currentTurn;
+      if (isNew && turn && (!p.turn_id || p.turn_id === turn.id)) {
+        const output2 = nonnegative(p.usage?.output_tokens);
+        if (output2 != null) turn.summedOutput = (turn.summedOutput ?? 0) + output2;
+        const cumulative = nonnegative(p.turn_token_usage?.output_tokens);
+        turn.nativeOutput = cumulative;
       }
       s.last = usage(p.usage);
       s.total = usage(p.thread_token_usage);
@@ -36789,21 +36810,35 @@ var SessionStore = class {
     if (p.type === "task_started") {
       s.turnId = p.turn_id;
       s.active = true;
-      s.startedAt = p.started_at ? new Date(p.started_at * 1e3).toISOString() : r.timestamp;
+      s.startedAt = p.started_at != null ? new Date(p.started_at * 1e3).toISOString() : r.timestamp;
       s.window = p.model_context_window || s.window;
       s.turn = null;
+      c.currentTurn = { id: p.turn_id, startedAt: timestamp(p.started_at) ?? timestamp(r.timestamp), nativeOutput: null, summedOutput: null, legacyBaseOutput: s.total?.output_tokens ?? 0, legacyOutput: null };
     }
     if (p.type === "task_complete") {
-      s.active = false;
-      s.ttftMs = p.time_to_first_token_ms ?? null;
-      s.ttftTurnId = p.turn_id;
+      const turn = c.currentTurn;
+      const matches = turn && (!p.turn_id || p.turn_id === turn.id);
+      s.latestCompletedTurn = completedTurn(p, r, matches ? turn : null);
+      s.ttftMs = s.latestCompletedTurn.ttftMs;
+      s.ttftTurnId = s.latestCompletedTurn.turnId;
+      if (!turn || matches) {
+        s.active = false;
+        c.currentTurn = null;
+      }
     }
-    if (p.type === "turn_aborted") s.active = false;
+    if (p.type === "turn_aborted" && (!p.turn_id || p.turn_id === s.turnId)) {
+      s.active = false;
+      c.currentTurn = null;
+    }
     if (p.type === "context_compacted") s.compactions++;
     if (p.type === "token_count" && p.info) {
       s.total = usage(p.info.total_token_usage);
       s.last = usage(p.info.last_token_usage);
       s.window = p.info.model_context_window || s.window;
+      if (c.currentTurn) {
+        const output2 = nonnegative(p.info.total_token_usage?.output_tokens);
+        if (output2 != null) c.currentTurn.legacyOutput = nonnegative(output2 - c.currentTurn.legacyBaseOutput);
+      }
       const total = p.info.total_token_usage?.total_tokens;
       if (!c.hasUsageRecords && Number.isFinite(total) && total > 0 && total !== c.lastLegacyTotal) {
         c.lastLegacyTotal = total;
@@ -36834,8 +36869,8 @@ function metadataThread(extra) {
 // src/server.mjs
 var store = new SessionStore();
 var html = await readFile2(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v7.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.7" }, { capabilities: { tools: {}, resources: {} } });
+var uri = "ui://session-metrics/panel-v8.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.8" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
 server.registerResource("session-metrics-ui", uri, {}, async () => ({ contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen" } } }] }));
 server.registerTool("open_metrics", { title: "statusx \xB7 \u4F1A\u8BDD\u6307\u6807", description: "\u684C\u9762\u7AEF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD\u6307\u6807\uFF0C\u4F7F\u7528\u5BBF\u4E3B\u8BF7\u6C42\u5143\u6570\u636E\u81EA\u52A8\u7ED1\u5B9A\u5F53\u524D\u804A\u5929\uFF0C\u65E0\u9700\u6A21\u578B\u53C2\u4E0E\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri, visibility: ["app"] }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {
