@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "codex-session-metrics",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Codex 本机会话指标：Token、缓存、上下文压缩、轮次 TTFT/TPS、工具耗时及近 10 轮趋势。",
   "extensions": {
     "com.openai": {
