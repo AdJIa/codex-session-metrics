@@ -2044,7 +2044,7 @@ var require_fast_deep_equal = __commonJS({
       if (a === b) return true;
       if (a && b && typeof a == "object" && typeof b == "object") {
         if (a.constructor !== b.constructor) return false;
-        var length, i, keys2;
+        var length, i, keys;
         if (Array.isArray(a)) {
           length = a.length;
           if (length != b.length) return false;
@@ -2055,13 +2055,13 @@ var require_fast_deep_equal = __commonJS({
         if (a.constructor === RegExp) return a.source === b.source && a.flags === b.flags;
         if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
         if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
-        keys2 = Object.keys(a);
-        length = keys2.length;
+        keys = Object.keys(a);
+        length = keys.length;
         if (length !== Object.keys(b).length) return false;
         for (i = length; i-- !== 0; )
-          if (!Object.prototype.hasOwnProperty.call(b, keys2[i])) return false;
+          if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
         for (i = length; i-- !== 0; ) {
-          var key = keys2[i];
+          var key = keys[i];
           if (!equal(a[key], b[key])) return false;
         }
         return true;
@@ -7284,13 +7284,13 @@ var util;
     });
   };
   util2.objectKeys = typeof Object.keys === "function" ? (obj) => Object.keys(obj) : (object3) => {
-    const keys2 = [];
+    const keys = [];
     for (const key in object3) {
       if (Object.prototype.hasOwnProperty.call(object3, key)) {
-        keys2.push(key);
+        keys.push(key);
       }
     }
-    return keys2;
+    return keys;
   };
   util2.find = (arr, checker) => {
     for (const item of arr) {
@@ -9525,8 +9525,8 @@ var ZodObject = class _ZodObject extends ZodType {
     if (this._cached !== null)
       return this._cached;
     const shape = this._def.shape();
-    const keys2 = util.objectKeys(shape);
-    this._cached = { shape, keys: keys2 };
+    const keys = util.objectKeys(shape);
+    this._cached = { shape, keys };
     return this._cached;
   }
   _parse(input2) {
@@ -11664,9 +11664,9 @@ function putProp(target, key, value) {
   else
     target[key] = value;
 }
-function mirrorShape(target, source, keys2, wrap) {
+function mirrorShape(target, source, keys, wrap) {
   const raw = sourceShape(source);
-  for (const key of keys2) {
+  for (const key of keys) {
     const desc = Object.getOwnPropertyDescriptor(raw, key);
     if (!desc.enumerable)
       continue;
@@ -11707,12 +11707,12 @@ function getElementAtPath(obj, path) {
   return path.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
-  const keys2 = Object.keys(promisesObj);
-  const promises = keys2.map((key) => promisesObj[key]);
+  const keys = Object.keys(promisesObj);
+  const promises = keys.map((key) => promisesObj[key]);
   return Promise.all(promises).then((results) => {
     const resolvedObj = {};
-    for (let i = 0; i < keys2.length; i++) {
-      resolvedObj[keys2[i]] = results[i];
+    for (let i = 0; i < keys.length; i++) {
+      resolvedObj[keys[i]] = results[i];
     }
     return resolvedObj;
   });
@@ -11934,15 +11934,15 @@ function pick(schema, mask) {
 }
 function maskedKeys(schema, mask) {
   const raw = sourceShape(schema);
-  const keys2 = [];
+  const keys = [];
   for (const key of Reflect.ownKeys(mask)) {
     if (!Object.getOwnPropertyDescriptor(raw, key)?.enumerable) {
       throw new Error(`Unrecognized key: "${String(key)}"`);
     }
     if (mask[key])
-      keys2.push(key);
+      keys.push(key);
   }
-  return keys2;
+  return keys;
 }
 function omit(schema, mask) {
   const currDef = schema._zod.def;
@@ -14346,10 +14346,10 @@ function handlePropertyResult(result2, final, key, input2, optin, optout) {
 }
 var NO_SYMBOL_KEYS = [];
 function normalizeDef(def) {
-  const keys2 = Object.keys(def.shape);
+  const keys = Object.keys(def.shape);
   const ownSymbols = Object.getOwnPropertySymbols(def.shape);
   const symbolKeys = ownSymbols.length ? ownSymbols : NO_SYMBOL_KEYS;
-  const allKeys = symbolKeys.length ? [...keys2, ...symbolKeys] : keys2;
+  const allKeys = symbolKeys.length ? [...keys, ...symbolKeys] : keys;
   for (const k of allKeys) {
     if (!def.shape?.[k]?._zod?.traits?.has("$ZodType")) {
       throw new Error(`Invalid element at key "${String(k)}": expected a Zod schema`);
@@ -14361,8 +14361,8 @@ function normalizeDef(def) {
     allKeys,
     symbolKeys,
     // string-only: handleCatchall matches it against `for...in`, which never yields a symbol
-    keySet: new Set(keys2),
-    numKeys: keys2.length,
+    keySet: new Set(keys),
+    numKeys: keys.length,
     optionalKeys: new Set(okeys)
   };
 }
@@ -14905,19 +14905,19 @@ function handleIntersectionResults(result2, left, right) {
   let unrecIssue;
   const keyIssues = /* @__PURE__ */ new Map();
   const collect = (iss, side) => {
-    let keys2;
+    let keys;
     if (iss.code === "unrecognized_keys" && !iss.path?.length) {
       unrecIssue ?? (unrecIssue = iss);
-      keys2 = iss.keys;
+      keys = iss.keys;
     } else if (iss.code === "invalid_key" && iss.origin === "record" && iss.path?.length === 1) {
       const k = String(iss.path[0]);
       if (!keyIssues.has(k))
         keyIssues.set(k, iss);
-      keys2 = [k];
+      keys = [k];
     } else {
       return false;
     }
-    for (const k of keys2) {
+    for (const k of keys) {
       if (!unrecKeys.has(k))
         unrecKeys.set(k, {});
       unrecKeys.get(k)[side] = true;
@@ -24586,13 +24586,13 @@ function generateObjectCheck(doc, ctx, schema, accessor, buildsValue = true) {
   const def = schema._zod.def;
   doc.write(`if (typeof ${accessor} !== "object" || ${accessor} === null || Array.isArray(${accessor})) return INVALID;`);
   const shape = def.shape;
-  const keys2 = Object.keys(shape);
+  const keys = Object.keys(shape);
   const symbolKeys = Object.getOwnPropertySymbols(shape);
-  const allKeys = symbolKeys.length ? [...keys2, ...symbolKeys] : keys2;
+  const allKeys = symbolKeys.length ? [...keys, ...symbolKeys] : keys;
   const keyExpr = (k) => typeof k === "symbol" ? addConstant(ctx, k) : esc(k);
   const propKey = (k) => typeof k === "symbol" ? `[${keyExpr(k)}]` : esc(k);
   const propShape = shape;
-  if (keys2.includes("__proto__")) {
+  if (keys.includes("__proto__")) {
     throw new ZodCompileUnsupportedError('object shape key "__proto__"');
   }
   const propOutputs = /* @__PURE__ */ new Map();
@@ -24634,7 +24634,7 @@ function generateObjectCheck(doc, ctx, schema, accessor, buildsValue = true) {
   if (catchall) {
     const catchallType = catchall._zod.def.type;
     if (catchallType === "never") {
-      const condition = keys2.map((k) => `k !== ${esc(k)}`).join(" && ") || "true";
+      const condition = keys.map((k) => `k !== ${esc(k)}`).join(" && ") || "true";
       doc.write(`for (const k in ${accessor}) {`);
       doc.indented((d) => {
         d.write(`if (${condition}) return INVALID;`);
@@ -24650,7 +24650,7 @@ function generateObjectCheck(doc, ctx, schema, accessor, buildsValue = true) {
   const hasConditionalKeys = allKeys.some((k) => mayOmitUndefined(propShape[k]) || dropsWhenAbsent(propShape[k]));
   if (!buildsValue) {
     if (unknownKeysMode === "schema") {
-      const knownSet = keys2.length > 0 ? addConstant(ctx, new Set(keys2)) : null;
+      const knownSet = keys.length > 0 ? addConstant(ctx, new Set(keys)) : null;
       doc.write(`for (const k in ${accessor}) {`);
       doc.indented((d) => {
         d.write(`if (k === "__proto__") continue;`);
@@ -24682,7 +24682,7 @@ function generateObjectCheck(doc, ctx, schema, accessor, buildsValue = true) {
     }
   }
   if (unknownKeysMode !== "none") {
-    const knownSet = keys2.length > 0 ? addConstant(ctx, new Set(keys2)) : null;
+    const knownSet = keys.length > 0 ? addConstant(ctx, new Set(keys)) : null;
     doc.write(`for (const k in ${accessor}) {`);
     doc.indented((d) => {
       d.write(`if (k === "__proto__") continue;`);
@@ -26701,8 +26701,8 @@ function compactTypeUnion(schema) {
     if (!option || typeof option !== "object")
       return;
     compactTypeUnion(option);
-    const keys2 = Object.keys(option);
-    if (keys2.length !== 1 || keys2[0] !== "type")
+    const keys = Object.keys(option);
+    if (keys.length !== 1 || keys[0] !== "type")
       return;
     const type = option.type;
     for (const member of Array.isArray(type) ? type : [type]) {
@@ -27950,10 +27950,10 @@ function visit(schema, fnOrHandlers) {
     switch (kind) {
       case "object": {
         const oldShape = def.shape;
-        const keys2 = Object.keys(oldShape);
+        const keys = Object.keys(oldShape);
         let changed = false;
         const newShape = {};
-        for (const k of keys2) {
+        for (const k of keys) {
           const mapped = run(oldShape[k]);
           if (mapped !== oldShape[k])
             changed = true;
@@ -29829,11 +29829,11 @@ var ZodEnum2 = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => enumProcessor(inst, ctx, json2, params);
   inst.enum = def.entries;
   inst.options = [...inst._zod.values];
-  const keys2 = new Set(Object.keys(def.entries));
+  const keys = new Set(Object.keys(def.entries));
   inst.extract = (values, params) => {
     const newEntries = {};
     for (const value of values) {
-      if (keys2.has(value)) {
+      if (keys.has(value)) {
         newEntries[value] = def.entries[value];
       } else
         throw new Error(`Key ${value} not found in enum`);
@@ -29848,7 +29848,7 @@ var ZodEnum2 = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
   inst.exclude = (values, params) => {
     const newEntries = { ...def.entries };
     for (const value of values) {
-      if (keys2.has(value)) {
+      if (keys.has(value)) {
         delete newEntries[value];
       } else
         throw new Error(`Key ${value} not found in enum`);
@@ -30409,8 +30409,8 @@ function checkObjectGuards(objectSchema, guards) {
     const value = payload.value;
     if (typeof value !== "object" || value === null || Array.isArray(value))
       return;
-    const keys2 = Object.getOwnPropertyNames(value);
-    if (guards.minProperties !== void 0 && keys2.length < guards.minProperties) {
+    const keys = Object.getOwnPropertyNames(value);
+    if (guards.minProperties !== void 0 && keys.length < guards.minProperties) {
       payload.issues.push({
         origin: "object",
         code: "too_small",
@@ -30422,7 +30422,7 @@ function checkObjectGuards(objectSchema, guards) {
         continue: true
       });
     }
-    if (guards.maxProperties !== void 0 && keys2.length > guards.maxProperties) {
+    if (guards.maxProperties !== void 0 && keys.length > guards.maxProperties) {
       payload.issues.push({
         origin: "object",
         code: "too_big",
@@ -30435,7 +30435,7 @@ function checkObjectGuards(objectSchema, guards) {
       });
     }
     if (guards.keySchema) {
-      for (const key of keys2) {
+      for (const key of keys) {
         const result2 = guards.keySchema.safeParse(key);
         if (result2.success)
           continue;
@@ -30476,9 +30476,9 @@ function canonicalKey(value, seen) {
       }
       return `a${parts2.length}:[${parts2.join(",")}]`;
     }
-    const keys2 = Object.keys(value).sort();
+    const keys = Object.keys(value).sort();
     const parts = [];
-    for (const k of keys2) {
+    for (const k of keys) {
       const key = canonicalKey(value[k], seen);
       if (key === null)
         return null;
@@ -33334,7 +33334,7 @@ function parseMapDef(def, refs) {
   if (refs.mapStrategy === "record") {
     return parseRecordDef(def, refs);
   }
-  const keys2 = parseDef(def.keyType._def, {
+  const keys = parseDef(def.keyType._def, {
     ...refs,
     currentPath: [...refs.currentPath, "items", "items", "0"]
   }) || parseAnyDef(refs);
@@ -33347,7 +33347,7 @@ function parseMapDef(def, refs) {
     maxItems: 125,
     items: {
       type: "array",
-      items: [keys2, values],
+      items: [keys, values],
       minItems: 2,
       maxItems: 2
     }
@@ -36660,22 +36660,92 @@ import { readdir, readFile, stat, open as open2 } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { StringDecoder } from "node:string_decoder";
-var UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
-var keys = ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens"];
-var usage = (u) => Object.fromEntries(keys.map((k) => [k, Number.isFinite(u?.[k]) ? u[k] : 0]));
+
+// src/metrics.mjs
+var usageKeys = ["input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens"];
 var nonnegative = (v) => Number.isFinite(v) && v >= 0 ? v : null;
 var timestamp = (v) => {
+  if (v == null) return null;
   const ms = typeof v === "number" ? v * 1e3 : Date.parse(v);
   return Number.isFinite(ms) ? ms : null;
 };
+var iso = (ms) => ms != null ? new Date(ms).toISOString() : null;
+var usage = (u) => Object.fromEntries(usageKeys.map((k) => [k, nonnegative(u?.[k])]));
+var zeroUsage = () => Object.fromEntries(usageKeys.map((k) => [k, 0]));
+function sumUsage(rows) {
+  return Object.fromEntries(usageKeys.map((k) => [k, rows.length && rows.every((u) => u?.[k] != null) ? rows.reduce((n, u) => n + u[k], 0) : null]));
+}
+function addUsage(a, b) {
+  return a ? sumUsage([a, b]) : usage(b);
+}
+function usageDifference(end, start) {
+  return Object.fromEntries(usageKeys.map((k) => [k, end?.[k] != null && start?.[k] != null ? nonnegative(end[k] - start[k]) : null]));
+}
+function cacheRatio(u) {
+  return u?.input_tokens > 0 && u.cached_input_tokens != null && u.cached_input_tokens <= u.input_tokens ? u.cached_input_tokens / u.input_tokens * 100 : null;
+}
+function unionDuration(intervals) {
+  let total = 0, end = null;
+  for (const [a, b] of intervals.slice().sort((a2, b2) => a2[0] - b2[0])) {
+    if (end == null || a > end) {
+      total += b - a;
+      end = b;
+    } else if (b > end) {
+      total += b - end;
+      end = b;
+    }
+  }
+  return total;
+}
 function completedTurn(p, r, turn) {
   const startedAt = timestamp(p.started_at) ?? turn?.startedAt ?? null;
   const completedAt = timestamp(p.completed_at) ?? timestamp(r.timestamp);
   const elapsed = startedAt != null && completedAt != null ? nonnegative(completedAt - startedAt) : null;
   const durationMs = nonnegative(p.duration_ms) ?? elapsed;
-  const outputTokens = turn?.nativeOutput ?? turn?.summedOutput ?? turn?.legacyOutput ?? null;
-  return { turnId: p.turn_id || turn?.id || null, startedAt: startedAt != null ? new Date(startedAt).toISOString() : null, completedAt: completedAt != null ? new Date(completedAt).toISOString() : null, ttftMs: nonnegative(p.time_to_first_token_ms), durationMs, outputTokens, tps: outputTokens != null && durationMs > 0 ? outputTokens / (durationMs / 1e3) : null, tpsBasis: "\u8BE5\u8F6E\u7D2F\u8BA1\u8F93\u51FA Token \xF7 \u6574\u8F6E\u8017\u65F6\uFF08\u542B\u5DE5\u5177\u6267\u884C\u548C\u7B49\u5F85\uFF09" };
+  const outputTokens = turn?.nativeUsage?.output_tokens ?? turn?.summedUsage?.output_tokens ?? turn?.legacyUsage?.output_tokens ?? null;
+  const tools = [...turn?.tools.values() || []];
+  const timed = tools.filter((t) => t.start != null && t.end != null && t.end >= t.start);
+  const boundsStart = turn?.startedAt ?? startedAt;
+  const boundsEnd = timestamp(r.timestamp) ?? completedAt;
+  const intervals = timed.map((t) => [Math.max(t.start, boundsStart ?? t.start), Math.min(t.end, boundsEnd ?? t.end)]).filter(([a, b]) => b >= a);
+  const toolDurationMs = turn?.hasItems ? timed.length || !tools.length ? Math.min(unionDuration(intervals), durationMs ?? Infinity) : null : null;
+  const configurations = turn?.configurations.length ? turn.configurations : turn ? [turn.configuration] : [];
+  return {
+    turnId: p.turn_id || turn?.id || null,
+    startedAt: iso(startedAt),
+    completedAt: iso(completedAt),
+    ttftMs: nonnegative(p.time_to_first_token_ms),
+    durationMs,
+    outputTokens,
+    tps: outputTokens != null && durationMs > 0 ? outputTokens / (durationMs / 1e3) : null,
+    configurations,
+    calls: turn?.calls ?? null,
+    toolDurationMs,
+    toolPercent: toolDurationMs != null && durationMs > 0 ? toolDurationMs / durationMs * 100 : null,
+    toolCount: turn?.hasItems ? tools.length : null,
+    timedToolCount: turn?.hasItems ? timed.length : null,
+    tpsBasis: "\u8BE5\u8F6E\u7D2F\u8BA1\u8F93\u51FA Token \xF7 \u6574\u8F6E\u8017\u65F6\uFF08\u542B\u5DE5\u5177\u6267\u884C\u548C\u7B49\u5F85\uFF09"
+  };
 }
+function turnSummary(turns) {
+  const ttfts = turns.map((t) => t.ttftMs).filter((v) => v != null).sort((a, b) => a - b);
+  const valid = turns.filter((t) => t.outputTokens != null && t.durationMs > 0);
+  const n = ttfts.length;
+  return {
+    window: 10,
+    turns: turns.length,
+    ttftSamples: n,
+    ttftMeanMs: n ? ttfts.reduce((a, b) => a + b, 0) / n : null,
+    ttftMedianMs: n ? (ttfts[Math.floor((n - 1) / 2)] + ttfts[Math.floor(n / 2)]) / 2 : null,
+    tpsSamples: valid.length,
+    weightedTps: valid.length ? valid.reduce((a, t) => a + t.outputTokens, 0) / (valid.reduce((a, t) => a + t.durationMs, 0) / 1e3) : null
+  };
+}
+
+// src/store.mjs
+var UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+var toolKinds = /* @__PURE__ */ new Set(["commandexecution", "mcptoolcall", "filechange", "dynamictoolcall", "collabtoolcall"]);
+var configuration = (s) => ({ model: s.model, effort: s.effort, provider: s.provider, serviceTier: s.serviceTier });
 var SessionStore = class {
   constructor(home = process.env.CODEX_HOME || join(homedir(), ".codex")) {
     this.home = home;
@@ -36738,27 +36808,45 @@ var SessionStore = class {
     await this.discover();
     const file2 = this.files.get(id);
     if (!file2) throw new Error("\u672C\u673A\u672A\u627E\u5230\u8BE5\u4F1A\u8BDD\u8BB0\u5F55\uFF1B\u8FDC\u7A0B\u4F1A\u8BDD\u9700\u8981\u5728\u5BF9\u5E94\u4E3B\u673A\u8FD0\u884C\u63D2\u4EF6\u3002");
-    const s = await stat(file2);
+    const info = await stat(file2);
     let c = this.cache.get(id);
-    if (!c || s.size < c.offset) {
-      c = { offset: 0, pending: "", decoder: new StringDecoder("utf8"), state: { id, model: null, provider: null, window: null, last: null, total: null, turn: null, turnId: null, active: false, startedAt: null, ttftMs: null, ttftTurnId: null, latestCompletedTurn: null, requests: 0, compactions: 0, updatedAt: null, recentCalls: [] }, seen: /* @__PURE__ */ new Set(), hasUsageRecords: false, lastLegacyTotal: null, currentTurn: null };
+    if (!c || info.size < c.offset || c.inode !== info.ino) {
+      c = {
+        offset: 0,
+        inode: info.ino,
+        pending: "",
+        decoder: new StringDecoder("utf8"),
+        state: { id, model: null, effort: null, provider: null, serviceTier: null, window: null, last: null, total: null, turn: null, turnId: null, active: false, startedAt: null, ttftMs: null, ttftTurnId: null, latestCompletedTurn: null, requests: 0, compactions: 0, latestCompaction: null, context: null, updatedAt: null, recentCalls: [], recentTurns: [] },
+        seen: /* @__PURE__ */ new Set(),
+        sequence: 0,
+        hasUsageRecords: false,
+        lastLegacyTotal: null,
+        currentTurn: null,
+        completed: /* @__PURE__ */ new Set(),
+        compactionSignals: /* @__PURE__ */ new Map(),
+        compactionRecords: [],
+        pendingCompaction: null
+      };
       this.cache.set(id, c);
     }
-    if (s.size > c.offset) {
+    if (info.size > c.offset) {
       const h = await open2(file2, "r");
       try {
-        while (c.offset < s.size) {
-          const b = Buffer.alloc(Math.min(s.size - c.offset, 1024 * 1024));
+        while (c.offset < info.size) {
+          const b = Buffer.alloc(Math.min(info.size - c.offset, 1024 * 1024));
           const { bytesRead } = await h.read(b, 0, b.length, c.offset);
           if (!bytesRead) break;
           c.offset += bytesRead;
           const lines = (c.pending + c.decoder.write(b.subarray(0, bytesRead))).split("\n");
           c.pending = lines.pop();
-          for (const l of lines) {
+          for (const line of lines) {
+            let record2;
             try {
-              this.apply(c, JSON.parse(l));
+              record2 = JSON.parse(line);
             } catch {
+              continue;
             }
+            this.apply(c, record2);
           }
         }
       } finally {
@@ -36766,84 +36854,178 @@ var SessionStore = class {
       }
     }
     const st = c.state;
-    const used = st.last?.total_tokens ?? null;
-    return { ...st, title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD", contextUsed: used, contextPercent: used !== null && st.window ? used / st.window * 100 : null, contextBasis: "\u6700\u8FD1\u4E00\u6B21\u6A21\u578B\u8BF7\u6C42\u7684\u8F93\u5165 + \u8F93\u51FA Token\uFF08\u5FEB\u7167\uFF1B\u4E0B\u6B21\u8BF7\u6C42\u524D\u53EF\u80FD\u589E\u957F\uFF09", sampledAt: (/* @__PURE__ */ new Date()).toISOString(), timing: { source: "codex", recordedCalls: st.recentCalls.length, latestCompletedTurn: st.latestCompletedTurn } };
+    const used = st.context?.tokens ?? null;
+    const recentUsage = sumUsage(st.recentCalls.map((call) => call.usage));
+    return {
+      ...st,
+      title: (await this.titles()).get(id) || "\u672A\u547D\u540D\u4F1A\u8BDD",
+      contextUsed: used,
+      contextPercent: used != null && st.window > 0 ? Math.min(100, used / st.window * 100) : null,
+      contextBasis: "Codex \u6700\u8FD1\u4E0A\u4E0B\u6587\u5FEB\u7167 / \u6709\u6548\u6A21\u578B\u7A97\u53E3\uFF1B\u538B\u7F29\u5FEB\u7167\u4E0E\u8BF7\u6C42\u7528\u91CF\u5206\u522B\u4FDD\u5B58",
+      recent: recentUsage,
+      recentCacheRatio: cacheRatio(recentUsage),
+      turnSummary: turnSummary(st.recentTurns),
+      sampledAt: (/* @__PURE__ */ new Date()).toISOString(),
+      timing: { source: "codex", recordedCalls: st.recentCalls.length, latestCompletedTurn: st.latestCompletedTurn }
+    };
+  }
+  setContext(c, tokens, at, source) {
+    if (nonnegative(tokens) == null) return;
+    c.state.context = { tokens, recordedAt: at || null, source };
+  }
+  settings(c, p) {
+    const s = c.state;
+    if (p.model) s.model = p.model;
+    if ("effort" in p) s.effort = p.effort;
+    if ("reasoning_effort" in p) s.effort = p.reasoning_effort;
+    if (p.model_provider_id || p.model_provider) s.provider = p.model_provider_id || p.model_provider;
+    if ("service_tier" in p) s.serviceTier = p.service_tier;
+    if (c.currentTurn) c.currentTurn.configuration = configuration(s);
+  }
+  recordCall(c, call) {
+    const s = c.state;
+    s.requests++;
+    s.recentCalls = [...s.recentCalls, call].slice(-10);
+    s.last = call.usage;
+    const turn = c.currentTurn;
+    if (turn && (!call.turnId || call.turnId === turn.id)) {
+      turn.calls++;
+      if (!turn.configurations.some((v) => JSON.stringify(v) === JSON.stringify(call.configuration))) turn.configurations.push(call.configuration);
+    }
+  }
+  compaction(c, r, source, p) {
+    const s = c.state;
+    const at = timestamp(r.timestamp);
+    const start = nonnegative(p.started_at_ms);
+    const end = nonnegative(p.completed_at_ms) ?? at;
+    const identity = source === "record" ? p.window_id ?? p.compaction_response_id ?? p.window_number : source === "item" ? p.item?.id : p.id;
+    const key = source + ":" + (identity ?? r.timestamp ?? c.sequence);
+    if (c.compactionSignals.has(key)) return c.compactionSignals.get(key);
+    let entry = c.compactionRecords.slice().reverse().find((e) => e.turnId === (p.turn_id || s.turnId) && !e.sources.has(source) && at != null && e.at != null && (Math.abs(e.at - at) <= 2e3 || start != null && e.at >= start && e.at <= (end ?? at)));
+    if (!entry) {
+      entry = { at, turnId: p.turn_id || s.turnId, sources: /* @__PURE__ */ new Set(), value: { recordedAt: r.timestamp || null, beforeTokens: s.context?.tokens ?? null, afterTokens: null, reductionPercent: null, durationMs: null } };
+      c.compactionRecords.push(entry);
+      s.compactions++;
+    }
+    entry.sources.add(source);
+    c.compactionSignals.set(key, entry);
+    if (source === "item" && start != null && end >= start) entry.value.durationMs = end - start;
+    if (entry.value.afterTokens == null) c.pendingCompaction = entry;
+    s.latestCompaction = entry.value;
+    return entry;
   }
   apply(c, r) {
     const p = r.payload || {}, s = c.state;
+    c.sequence++;
     s.updatedAt = r.timestamp || s.updatedAt;
     if (r.type === "session_meta") {
       s.provider = p.model_provider || null;
       return;
     }
     if (r.type === "turn_context") {
-      s.model = p.model || s.model;
+      this.settings(c, p);
+      return;
+    }
+    if (r.type === "compacted") {
+      this.compaction(c, r, "record", p);
       return;
     }
     if (r.type === "token_usage_record") {
+      const rid = p.response_id ?? "ordinal:" + (r.ordinal ?? c.sequence);
+      if (c.seen.has(rid)) return;
       if (!c.hasUsageRecords) {
         c.hasUsageRecords = true;
         s.recentCalls = [];
         s.requests = 0;
         c.seen.clear();
       }
-      const rid = p.response_id || "ordinal:" + r.ordinal;
-      const isNew = !c.seen.has(rid);
-      if (isNew) {
-        s.requests++;
-        c.seen.add(rid);
-        s.recentCalls = [...s.recentCalls, { responseId: p.response_id || null, turnId: p.turn_id || s.turnId, recordedAt: r.timestamp || null, model: s.model, usage: usage(p.usage), source: "token_usage_record" }].slice(-10);
-      }
+      c.seen.add(rid);
+      const u = usage(p.usage);
+      this.recordCall(c, { responseId: p.response_id || null, turnId: p.turn_id || s.turnId, recordedAt: r.timestamp || null, model: s.model, configuration: configuration(s), usage: u, source: "token_usage_record" });
       const turn = c.currentTurn;
-      if (isNew && turn && (!p.turn_id || p.turn_id === turn.id)) {
-        const output2 = nonnegative(p.usage?.output_tokens);
-        if (output2 != null) turn.summedOutput = (turn.summedOutput ?? 0) + output2;
-        const cumulative = nonnegative(p.turn_token_usage?.output_tokens);
-        turn.nativeOutput = cumulative;
+      if (turn && (!p.turn_id || p.turn_id === turn.id)) {
+        turn.summedUsage = addUsage(turn.summedUsage, u);
+        turn.nativeUsage = p.turn_token_usage ? usage(p.turn_token_usage) : null;
+        s.turn = turn.nativeUsage ?? turn.summedUsage;
       }
-      s.last = usage(p.usage);
-      s.total = usage(p.thread_token_usage);
-      s.turn = usage(p.turn_token_usage);
+      if (p.thread_token_usage) s.total = usage(p.thread_token_usage);
+      this.setContext(c, u.total_tokens, r.timestamp, "request");
+      c.pendingCompaction = null;
       return;
     }
     if (r.type !== "event_msg") return;
+    if (p.type === "thread_settings_applied") {
+      this.settings(c, p.thread_settings || {});
+      return;
+    }
     if (p.type === "task_started") {
       s.turnId = p.turn_id;
       s.active = true;
-      s.startedAt = p.started_at != null ? new Date(p.started_at * 1e3).toISOString() : r.timestamp;
+      s.startedAt = iso(timestamp(p.started_at) ?? timestamp(r.timestamp));
       s.window = p.model_context_window || s.window;
       s.turn = null;
-      c.currentTurn = { id: p.turn_id, startedAt: timestamp(p.started_at) ?? timestamp(r.timestamp), nativeOutput: null, summedOutput: null, legacyBaseOutput: s.total?.output_tokens ?? 0, legacyOutput: null };
+      c.currentTurn = { id: p.turn_id, startedAt: timestamp(r.timestamp) ?? timestamp(p.started_at), configuration: configuration(s), configurations: [], calls: 0, nativeUsage: null, summedUsage: null, legacyBase: s.total ?? zeroUsage(), legacyUsage: null, hasItems: false, tools: /* @__PURE__ */ new Map() };
+      return;
+    }
+    if (p.type === "item_completed") {
+      const kind = (p.item?.type || "").replaceAll("_", "").toLowerCase();
+      if (kind === "contextcompaction") this.compaction(c, r, "item", p);
+      const turn = c.currentTurn;
+      if (turn && (!p.turn_id || p.turn_id === turn.id)) {
+        turn.hasItems = true;
+        if (toolKinds.has(kind)) turn.tools.set(p.item.id ?? r.ordinal ?? c.sequence, { start: nonnegative(p.started_at_ms), end: nonnegative(p.completed_at_ms) });
+      }
+      return;
     }
     if (p.type === "task_complete") {
+      const id = p.turn_id || s.turnId;
+      if (c.completed.has(id)) return;
+      c.completed.add(id);
       const turn = c.currentTurn;
       const matches = turn && (!p.turn_id || p.turn_id === turn.id);
       s.latestCompletedTurn = completedTurn(p, r, matches ? turn : null);
       s.ttftMs = s.latestCompletedTurn.ttftMs;
       s.ttftTurnId = s.latestCompletedTurn.turnId;
+      s.recentTurns = [...s.recentTurns, s.latestCompletedTurn].slice(-10);
       if (!turn || matches) {
         s.active = false;
         c.currentTurn = null;
       }
+      return;
     }
     if (p.type === "turn_aborted" && (!p.turn_id || p.turn_id === s.turnId)) {
       s.active = false;
       c.currentTurn = null;
+      return;
     }
-    if (p.type === "context_compacted") s.compactions++;
+    if (p.type === "context_compacted") {
+      this.compaction(c, r, "legacy", p);
+      return;
+    }
     if (p.type === "token_count" && p.info) {
-      s.total = usage(p.info.total_token_usage);
-      s.last = usage(p.info.last_token_usage);
-      s.window = p.info.model_context_window || s.window;
-      if (c.currentTurn) {
-        const output2 = nonnegative(p.info.total_token_usage?.output_tokens);
-        if (output2 != null) c.currentTurn.legacyOutput = nonnegative(output2 - c.currentTurn.legacyBaseOutput);
+      const info = p.info;
+      const total = usage(info.total_token_usage);
+      const last = usage(info.last_token_usage);
+      s.window = info.model_context_window || s.window;
+      const synthetic = info.last_usage_includes_reasoning === true && last.input_tokens === 0 && last.output_tokens === 0 && last.total_tokens > 0;
+      const compacted = !!c.pendingCompaction || synthetic;
+      this.setContext(c, last.total_tokens, r.timestamp, compacted ? "compaction" : "request");
+      if (c.pendingCompaction && last.total_tokens != null) {
+        const v = c.pendingCompaction.value;
+        v.afterTokens = last.total_tokens;
+        v.reductionPercent = v.beforeTokens > 0 ? (v.beforeTokens - v.afterTokens) / v.beforeTokens * 100 : null;
+        c.pendingCompaction = null;
       }
-      const total = p.info.total_token_usage?.total_tokens;
-      if (!c.hasUsageRecords && Number.isFinite(total) && total > 0 && total !== c.lastLegacyTotal) {
-        c.lastLegacyTotal = total;
-        s.requests++;
-        s.recentCalls = [...s.recentCalls, { responseId: null, turnId: s.turnId, recordedAt: r.timestamp || null, model: s.model, usage: s.last, source: "token_count" }].slice(-10);
+      if (!c.hasUsageRecords) {
+        if (info.total_token_usage) s.total = total;
+        if (c.currentTurn) {
+          c.currentTurn.legacyUsage = usageDifference(total, c.currentTurn.legacyBase);
+          s.turn = c.currentTurn.legacyUsage;
+        }
+        const n = total.total_tokens;
+        const advanced = n != null && n > 0 && n !== c.lastLegacyTotal;
+        if (!compacted && advanced) this.recordCall(c, { responseId: null, turnId: s.turnId, recordedAt: r.timestamp || null, model: s.model, configuration: configuration(s), usage: last, source: "token_count" });
+        if (n != null) c.lastLegacyTotal = n;
       }
     }
   }
@@ -36869,8 +37051,8 @@ function metadataThread(extra) {
 // src/server.mjs
 var store = new SessionStore();
 var html = await readFile2(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v8.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.8" }, { capabilities: { tools: {}, resources: {} } });
+var uri = "ui://session-metrics/panel-v9.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.9" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
 server.registerResource("session-metrics-ui", uri, {}, async () => ({ contents: [{ uri, mimeType: "text/html;profile=mcp-app", text: html, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } }, "openai/ui": { availableDisplayModes: ["inline", "fullscreen"], preferredDisplayMode: "fullscreen" } } }] }));
 server.registerTool("open_metrics", { title: "statusx \xB7 \u4F1A\u8BDD\u6307\u6807", description: "\u684C\u9762\u7AEF\u76F4\u63A5\u6253\u5F00\u5F53\u524D\u4F1A\u8BDD\u6307\u6807\uFF0C\u4F7F\u7528\u5BBF\u4E3B\u8BF7\u6C42\u5143\u6570\u636E\u81EA\u52A8\u7ED1\u5B9A\u5F53\u524D\u804A\u5929\uFF0C\u65E0\u9700\u6A21\u578B\u53C2\u4E0E\u3002", inputSchema: { thread_id: external_exports.string().regex(UUID).optional() }, annotations: { readOnlyHint: true, openWorldHint: false }, _meta: { ui: { resourceUri: uri, visibility: ["app"] }, "openai/ui": { entrypoints: [{ type: "thread" }] } } }, async ({ thread_id }, extra) => {
