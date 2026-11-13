@@ -36816,8 +36816,8 @@ async function ensureProxy() {
 if (!process.argv.includes("--preview")) await ensureProxy();
 var store = new SessionStore();
 var html = await readFile3(new URL("./panel.html", import.meta.url), "utf8");
-var uri = "ui://session-metrics/panel-v3.html";
-var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.3" }, { capabilities: { tools: {}, resources: {} } });
+var uri = "ui://session-metrics/panel-v4.html";
+var server = new McpServer({ name: "\u4F1A\u8BDD\u6307\u6807", version: "0.1.4" }, { capabilities: { tools: {}, resources: {} } });
 var result = (d) => ({ content: [], structuredContent: d });
 function metadataThread(extra) {
   const m = extra?._meta || {};

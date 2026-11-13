@@ -10,7 +10,7 @@ function render(s){snapshot=s;threadId=s.id;el('error').classList.add('hide');se
   set('ttft-note',a?.ttftSamples?'近 10 次调用 · '+a.ttftSamples+' 个有效样本':'等待模型调用计时');
   set('tps',a?.tps!=null?'≈ '+a.tps.toFixed(1):'—');
   set('tps-note',a?.tpsSamples?'近 10 次调用 · '+a.tpsSamples+' 个有效样本':'需启用计时代理');
-  const u=s[el('scope').value];set('input',fmt(u?.input_tokens));set('output',fmt(u?.output_tokens));set('cached',fmt(u?.cached_input_tokens));set('reasoning','推理 '+fmt(u?.reasoning_output_tokens));set('requests','会话请求 '+fmt(s.requests));set('model',(s.model||'未知模型')+' · '+(s.provider||'未知提供商'));set('session',s.id);set('updated',new Date(s.sampledAt).toLocaleTimeString('zh-CN',{hour12:false}));if(!editing)el('bind').classList.add('hide');}
+  const u=s[el('scope').value];set('input',fmt(u?.input_tokens));set('output',fmt(u?.output_tokens));set('cached',fmt(u?.cached_input_tokens));const cachePercent=Number.isFinite(u?.input_tokens)&&u.input_tokens>0&&Number.isFinite(u?.cached_input_tokens)?u.cached_input_tokens/u.input_tokens*100:null;set('cache-ratio',cachePercent==null?'—':cachePercent.toFixed(1)+'%');set('reasoning','推理 '+fmt(u?.reasoning_output_tokens));set('requests','会话请求 '+fmt(s.requests));set('model',(s.model||'未知模型')+' · '+(s.provider||'未知提供商'));set('session',s.id);set('updated',new Date(s.sampledAt).toLocaleTimeString('zh-CN',{hour12:false}));if(!editing)el('bind').classList.add('hide');}
 async function call(name,args={}){const r=await app.callServerTool({name,arguments:args});if(r.isError)throw new Error(r.content?.find(c=>c.type==='text')?.text||'工具返回错误');return r.structuredContent;}
 async function poll(){if(stopped||busy||(!threadId&&!preview))return;busy=true;try{const d=preview?await (await fetch('/snapshot')).json():await call('read_metrics',{thread_id:threadId});if(d.error)throw new Error(d.error);render(d);}catch(e){error(e);}finally{busy=false;}}
 el('scope').onchange=()=>snapshot&&render(snapshot);el('change').onclick=()=>{editing=!editing;el('bind').classList.toggle('hide',!editing);};
@@ -18,7 +18,7 @@ el('bind-button').onclick=async()=>{threadId=el('thread-id').value.trim();editin
 el('recent').onclick=async()=>{try{const {sessions}=await call('list_sessions');el('sessions').replaceChildren(new Option('选择会话（请核对 ID）',''),...sessions.map(s=>new Option(new Date(s.mtime).toLocaleString('zh-CN')+' · '+s.id,s.id)));el('sessions').classList.remove('hide');}catch(e){error(e);}};
 el('sessions').onchange=()=>{if(el('sessions').value){el('thread-id').value=el('sessions').value;}};
 if(preview){connected=true;poll();}else{
-  app=new App({name:'会话指标',version:'0.1.3'});
+  app=new App({name:'会话指标',version:'0.1.4'});
   app.ontoolresult=r=>{const d=r.structuredContent;if(d?.snapshot)render(d.snapshot);else if(d?.threadId){threadId=d.threadId;poll();}else if(d?.needsBinding){set('live','等待绑定');el('bind').classList.remove('hide');}};
   app.onhostcontextchanged=ctx=>{if(ctx.theme)applyDocumentTheme(ctx.theme);};app.onteardown=async()=>{stopped=true;return {};};
   try{await app.connect();connected=true;const ctx=app.getHostContext();if(ctx?.theme)applyDocumentTheme(ctx.theme);if(!threadId){set('live','等待绑定');el('bind').classList.remove('hide');}poll();}catch(e){error(e);}

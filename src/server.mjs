@@ -8,8 +8,8 @@ import {ensureProxy} from './ensure-proxy.mjs';
 if(!process.argv.includes('--preview'))await ensureProxy();
 const store=new SessionStore();
 const html=await readFile(new URL('./panel.html',import.meta.url),'utf8');
-const uri='ui://session-metrics/panel-v3.html';
-const server=new McpServer({name:'会话指标',version:'0.1.3'},{capabilities:{tools:{},resources:{}}});
+const uri='ui://session-metrics/panel-v4.html';
+const server=new McpServer({name:'会话指标',version:'0.1.4'},{capabilities:{tools:{},resources:{}}});
 const result=d=>({content:[],structuredContent:d});
 function metadataThread(extra){const m=extra?._meta||{};return [m['openai/threadId'],m['openai/thread_id'],m['openai/conversationId']].find(x=>typeof x==='string'&&UUID.test(x));}
 server.registerResource('session-metrics-ui',uri,{},async()=>({contents:[{uri,mimeType:'text/html;profile=mcp-app',text:html,_meta:{ui:{prefersBorder:true,csp:{connectDomains:[],resourceDomains:[]}},'openai/ui':{availableDisplayModes:['inline','fullscreen'],preferredDisplayMode:'fullscreen'}}}]}));
