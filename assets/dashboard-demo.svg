@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1120" viewBox="0 0 1440 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Codex 会话指标看板示例</title>
+  <desc id="desc">脱敏演示数据：上下文环形图、Token 用量、最近完成轮次、上下文压缩和近十轮趋势。</desc>
+  <defs>
+    <style>
+      .bg{fill:#f6f7f5}.card{fill:#fff;stroke:#e1e7e1;stroke-width:2}.text{fill:#192d2a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.muted{fill:#64746d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.num{font-variant-numeric:tabular-nums}.line{stroke:#e1e7e1;stroke-width:2}.accent{fill:#0c8069}.accent-stroke{stroke:#0c8069}.soft{fill:#e6f5ee}
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="1120"/>
+  <g transform="translate(40 36)">
+    <rect class="card" width="1360" height="172" rx="18"/>
+    <text class="text" x="28" y="34" font-size="18" font-weight="600">上下文快照</text>
+    <circle cx="1294" cy="29" r="5" class="accent"/><text class="muted" x="1308" y="35" font-size="14">已同步</text>
+    <circle cx="122" cy="105" r="56" fill="none" stroke="#e1e7e1" stroke-width="12"/>
+    <circle cx="122" cy="105" r="56" fill="none" stroke="#0c8069" stroke-width="12" stroke-linecap="round" pathLength="100" stroke-dasharray="50.3 100" transform="rotate(-90 122 105)"/>
+    <text class="text num" x="122" y="108" text-anchor="middle" font-size="26" font-weight="600">50.3%</text><text class="muted" x="122" y="130" text-anchor="middle" font-size="13">已占用</text>
+    <text class="text num" x="215" y="91" font-size="20">64,320 / 128,000 tokens</text><text class="muted num" x="215" y="120" font-size="14">剩余 63,680</text><text class="muted" x="215" y="148" font-size="13">快照更新于 2026/01/15 16:30 · 请求结算后</text>
+  </g>
+  <g transform="translate(40 224)">
+    <rect class="card" width="1360" height="184" rx="18"/>
+    <text class="text" x="28" y="34" font-size="18" font-weight="600">Token 用量</text><rect x="1195" y="16" width="137" height="30" rx="7" fill="#fff" stroke="#e1e7e1"/><text class="text" x="1211" y="36" font-size="13">整个会话　⌄</text>
+    <line class="line" x1="450" y1="60" x2="450" y2="122"/><line class="line" x1="900" y1="60" x2="900" y2="122"/>
+    <text class="muted" x="28" y="72" font-size="14">输入</text><text class="text num" x="28" y="106" font-size="27" font-weight="600">505,000</text>
+    <text class="muted" x="478" y="72" font-size="14">输出</text><text class="text num" x="478" y="106" font-size="27" font-weight="600">6,070</text>
+    <text class="muted" x="928" y="72" font-size="14">缓存输入</text><text class="text num" x="928" y="106" font-size="27" font-weight="600">453,000</text><text class="muted" x="928" y="130" font-size="13">占输入 <tspan class="accent" font-weight="600">89.7%</tspan></text>
+    <rect x="28" y="146" width="1304" height="6" rx="3" fill="#e1e7e1"/><rect x="28" y="146" width="1169" height="6" rx="3" class="accent"/>
+    <text class="muted num" x="28" y="174" font-size="13">推理 1,420</text><text class="muted num" x="670" y="174" text-anchor="middle" font-size="13">调用 10</text><text class="muted num" x="1332" y="174" text-anchor="end" font-size="13">未命中缓存 52,000　·　缓存写入 0</text>
+  </g>
+  <g transform="translate(40 424)">
+    <rect class="card" width="1360" height="182" rx="18"/>
+    <text class="text" x="28" y="34" font-size="18" font-weight="600">最近完成轮次</text>
+    <line class="line" x1="680" y1="58" x2="680" y2="128"/>
+    <text class="muted" x="28" y="70" font-size="14">TTFT</text><text class="text num" x="28" y="107" font-size="31" font-weight="600">2.50</text><text class="muted" x="102" y="107" font-size="14">秒</text><text class="muted" x="28" y="132" font-size="13">完成于 2026/01/15 16:30:00</text>
+    <text class="muted" x="724" y="70" font-size="14">TPS · 整轮</text><text class="text num" x="724" y="107" font-size="31" font-weight="600">16.3</text><text class="muted" x="800" y="107" font-size="14">tok/s</text><text class="muted" x="724" y="132" font-size="13">1,610 输出 Token ÷ 99 秒（整轮）</text>
+    <line class="line" x1="28" y1="148" x2="1332" y2="148"/><text class="muted" x="28" y="171" font-size="13">工具耗时 <tspan class="text" font-weight="600">5.1 秒</tspan>　　占整轮 <tspan class="text" font-weight="600">5.2%</tspan></text><text class="muted" x="1332" y="171" text-anchor="end" font-size="13">› 配置与工具明细</text>
+  </g>
+  <g transform="translate(40 622)">
+    <rect class="card" width="1360" height="148" rx="18"/>
+    <text class="text" x="28" y="34" font-size="18" font-weight="600">上下文压缩</text><text class="muted num" x="1332" y="34" text-anchor="end" font-size="14">1 次</text>
+    <text class="text num" x="28" y="72" font-size="25" font-weight="600">118,000 → 42,000 tokens</text>
+    <text class="muted" x="28" y="96" font-size="13">压缩前</text><rect x="105" y="87" width="1227" height="8" rx="4" fill="#aeb9b4"/>
+    <text class="muted" x="28" y="119" font-size="13">压缩后</text><rect x="105" y="110" width="437" height="8" rx="4" class="accent"/>
+    <text class="muted" x="28" y="140" font-size="13">最近压缩 2026/01/15 16:00 · 下降 64.4% · 耗时 18.4 秒</text>
+  </g>
+  <g transform="translate(40 786)">
+    <rect class="card" width="1360" height="290" rx="18"/>
+    <text class="text" x="28" y="34" font-size="18" font-weight="600">最近 10 个已完成轮次</text><text class="muted" x="1332" y="34" text-anchor="end" font-size="14">8 / 10 轮</text>
+    <line class="line" x1="680" y1="56" x2="680" y2="185"/>
+    <text class="muted" x="28" y="67" font-size="14">TTFT 平均</text><text class="text num" x="28" y="103" font-size="27" font-weight="600">2.46 秒</text><text class="muted" x="28" y="126" font-size="13">中位数 2.45 秒 · 8 个有效样本</text>
+    <polyline points="30,166 105,148 180,157 255,121 330,140 405,130 480,151 555,136" fill="none" stroke="#0c8069" stroke-width="3"/><circle cx="30" cy="166" r="4" class="accent"/><circle cx="105" cy="148" r="4" class="accent"/><circle cx="180" cy="157" r="4" class="accent"/><circle cx="255" cy="121" r="4" class="accent"/><circle cx="330" cy="140" r="4" class="accent"/><circle cx="405" cy="130" r="4" class="accent"/><circle cx="480" cy="151" r="4" class="accent"/><circle cx="555" cy="136" r="4" class="accent"/>
+    <text class="muted" x="724" y="67" font-size="14">整轮 TPS · 加权</text><text class="text num" x="724" y="103" font-size="27" font-weight="600">16.0 tok/s</text><text class="muted" x="724" y="126" font-size="13">总输出 ÷ 总耗时 · 8 个有效样本</text>
+    <polyline points="724,149 799,165 874,151 949,158 1024,142 1099,150 1174,137 1249,145" fill="none" stroke="#0c8069" stroke-width="3"/><circle cx="724" cy="149" r="4" class="accent"/><circle cx="799" cy="165" r="4" class="accent"/><circle cx="874" cy="151" r="4" class="accent"/><circle cx="949" cy="158" r="4" class="accent"/><circle cx="1024" cy="142" r="4" class="accent"/><circle cx="1099" cy="150" r="4" class="accent"/><circle cx="1174" cy="137" r="4" class="accent"/><circle cx="1249" cy="145" r="4" class="accent"/>
+    <text class="muted" x="28" y="253" font-size="13">已完成轮次趋势　　　　　　　　　　　　　　　　　　　　　　　　　　　旧 → 新</text>
+  </g>
+</svg>
